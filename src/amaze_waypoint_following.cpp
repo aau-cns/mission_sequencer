@@ -31,6 +31,8 @@
 #include <iostream> // cout
 #include <fstream> // ifstream
 #include <math.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 using namespace std;
 
 double l2_norm(vector<double> const& u)
@@ -215,11 +217,34 @@ int main(int argc, char **argv)
             vect_1 = { set_pose.pose.position.x-current_pose.pose.position.x, 
                     set_pose.pose.position.y-current_pose.pose.position.y,
                     set_pose.pose.position.z-current_pose.pose.position.z };
+            
+            tf2::Quaternion q_curr( current_pose.pose.orientation.x,
+                                    current_pose.pose.orientation.y,
+                                    current_pose.pose.orientation.z,
+                                    current_pose.pose.orientation.w );
+            tf2::Matrix3x3 m_curr(q_curr);
+            double roll_curr, pitch_curr, yaw_curr;
+            m_curr.getRPY(roll_curr, pitch_curr, yaw_curr);
+            tf2::Quaternion q_set( set_pose.pose.orientation.x,
+                                   set_pose.pose.orientation.y,
+                                   set_pose.pose.orientation.z,
+                                   set_pose.pose.orientation.w );
+            tf2::Matrix3x3 m_set(q_set);
+            double roll_set, pitch_set, yaw_set;
+            m_set.getRPY(roll_set, pitch_set, yaw_set);
 
-            printf("Current Pose: [%1.2f, %1.2f, %1.2f, %1.2f]\n",current_pose.pose.position.x,current_pose.pose.position.y,current_pose.pose.position.z,current_pose.pose.orientation.z);
-            printf("Set Pose: [%1.2f, %1.2f, %1.2f, %1.2f]\n",set_pose.pose.position.x,set_pose.pose.position.y,set_pose.pose.position.z,set_pose.pose.orientation.z);
+            double e_yaw = yaw_curr-yaw_set;
+
+            printf("Current Pose: [%1.2f, %1.2f, %1.2f, %1.2f]\n",current_pose.pose.position.x,current_pose.pose.position.y,current_pose.pose.position.z,yaw_curr);
+            printf("Set Pose: [%1.2f, %1.2f, %1.2f, %1.2f]\n",set_pose.pose.position.x,set_pose.pose.position.y,set_pose.pose.position.z,yaw_set);
             printf("Current State: %d\n",current_state_FSM);
             printf("Current 2-Norm value: %f\n",l2_norm(vect_1));
+            printf("Current yaw difference: %f\n",e_yaw);
+
+            tf2::Quaternion q_1,q_2;
+            tf2::convert(starting_pose.pose.orientation , q_1);
+            tf2::Matrix3x3 m_q_1(q_1);                       
+            double roll_q_1, pitch_q_1, yaw_q_1;
 
             switch (current_state_FSM)
             {
@@ -243,11 +268,17 @@ int main(int argc, char **argv)
                     printf("Waypoints sent.\n");
                     set_pose.pose.position.x = starting_pose.pose.position.x + data.at(i).at(1);
                     set_pose.pose.position.y = starting_pose.pose.position.y + data.at(i).at(2);
-                    set_pose.pose.position.z = starting_pose.pose.position.z + data.at(i).at(3);
+                    set_pose.pose.position.z = starting_pose.pose.position.z + data.at(i).at(3);      
+                    q_2.setRotation(tf2::Vector3(0,0,1),data.at(i).at(4)+yaw_q_1);
+                    q_2.normalize();
+                    set_pose.pose.orientation.w = q_2[3];
+                    set_pose.pose.orientation.x = q_2[0];
+                    set_pose.pose.orientation.y = q_2[1];
+                    set_pose.pose.orientation.z = q_2[2];
                     current_state_FSM = CHECK;
                     break;
                 case CHECK:
-                    if ( l2_norm(vect_1) < 0.1 )
+                    if ( l2_norm(vect_1) < 0.1 && e_yaw < 0.002 )
                     {
                         printf("Waypoints reached.\n");
                         i++;
