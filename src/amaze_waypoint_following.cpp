@@ -264,6 +264,7 @@ int main(int argc, char **argv)
             tf2::convert(starting_pose.pose.orientation , q_1);
             tf2::Matrix3x3 m_q_1(q_1);                       
             double roll_q_1, pitch_q_1, yaw_q_1;
+            m_q_1.getRPY(roll_q_1, pitch_q_1, yaw_q_1);
 
             switch (current_state_FSM)
             {
