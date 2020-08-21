@@ -110,22 +110,22 @@ int main(int argc, char **argv)
     ros::NodeHandle nh;
 
     ros::Subscriber state_sub = nh.subscribe<mavros_msgs::State>
-            ("mavros/state", 10, state_cb);
+            ("/mavros/state", 10, state_cb);
     ros::Subscriber current_sub = nh.subscribe<geometry_msgs::PoseStamped>
             ("/mavros/local_position/pose", 10, current_cb);
             // ("/ov_pose", 10, current_cb);
     ros::Publisher setpoint_pub = nh.advertise<mavros_msgs::PositionTarget>
             ("/mavros/setpoint_raw/local", 10);
     ros::Publisher local_pos_pub = nh.advertise<geometry_msgs::PoseStamped>
-            ("mavros/setpoint_position/local", 10);
+            ("/mavros/setpoint_position/local", 10);
     ros::Publisher vel_pub = nh.advertise<geometry_msgs::Twist>
             ("/mavros/setpoint_velocity/cmd_vel_unstamped", 10);
     ros::ServiceClient arming_client = nh.serviceClient<mavros_msgs::CommandBool>
-            ("mavros/cmd/arming");
+            ("/mavros/cmd/arming");
     ros::ServiceClient landing_client = nh.serviceClient<mavros_msgs::CommandTOL>
-            ("mavros/cmd/land");
+            ("/mavros/cmd/land");
     ros::ServiceClient set_mode_client = nh.serviceClient<mavros_msgs::SetMode>
-            ("mavros/set_mode");
+            ("/mavros/set_mode");
 
     //the setpoint publishing rate MUST be faster than 2Hz
     ros::Rate rate(20.0);
@@ -190,26 +190,45 @@ int main(int argc, char **argv)
     vector<double> vect_1;
 
     while( ros::ok() && !exit_programm )
-    {
-        if( current_state.mode != "OFFBOARD" && (ros::Time::now() - last_request > ros::Duration(5.0)) )
-        {
-            if( set_mode_client.call(offb_set_mode) && offb_set_mode.response.mode_sent )
-            {
-                ROS_INFO("Offboard enabled");
+    {   
+        // if( current_state.mode != "OFFBOARD" && (ros::Time::now() - last_request > ros::Duration(5.0)) )
+        // {
+        //     if( set_mode_client.call(offb_set_mode) && offb_set_mode.response.mode_sent )
+        //     {
+        //         ROS_INFO("Offboard enabled");
+        //     }
+        //     last_request = ros::Time::now();
+        // }   
+        // else
+        // {   
+        //     if( !current_state.armed && (ros::Time::now() - last_request > ros::Duration(5.0)) )
+        //     {
+        //         if( arming_client.call(arm_cmd) && arm_cmd.response.success )
+        //         {
+        //             ROS_INFO("Vehicle armed");
+        //             run_FSM = true;
+        //         }
+        //         last_request = ros::Time::now();
+        //     }    
+        // }
+        if( !current_state.armed &&
+            (ros::Time::now() - last_request > ros::Duration(5.0))){
+            if( arming_client.call(arm_cmd) &&
+                arm_cmd.response.success){
+                ROS_INFO("Vehicle armed");
             }
             last_request = ros::Time::now();
-        }         
-        else
-        {      
-            if( !current_state.armed && (ros::Time::now() - last_request > ros::Duration(5.0)) )
-            {
-                if( arming_client.call(arm_cmd) && arm_cmd.response.success )
-                {
-                    ROS_INFO("Vehicle armed");
+        } else {
+            
+            if( current_state.mode != "OFFBOARD" &&
+            (ros::Time::now() - last_request > ros::Duration(5.0))){
+                if( set_mode_client.call(offb_set_mode) &&
+                    offb_set_mode.response.mode_sent){
+                    ROS_INFO("Offboard enabled");
                     run_FSM = true;
                 }
                 last_request = ros::Time::now();
-            }     
+            }
         }
 
         if ( run_FSM == true )
