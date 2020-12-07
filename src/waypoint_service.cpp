@@ -37,7 +37,6 @@ static ros::ServiceClient set_mode_client;
 static ros::ServiceServer wp_service;
 
 static bool standby = true;
-static bool active_flight = false;
 static bool pose_msg_ok = false;
 static bool state_msg_ok = false;
 static bool ext_state_msg_ok = false;
@@ -164,7 +163,8 @@ bool wp_srv_callback(amaze_waypoint_following::wp_service::Request& req,
   // geometry_msgs::TwistStamped vel;
   // geometry_msgs::PoseStamped init_pose(current_pose);
 
-  if (active_flight == false)
+  // Check that we are not in the air and initialize the PX4
+  if (current_ext_state.landed_state == current_ext_state.LANDED_STATE_ON_GROUND)
   {
     mavros_msgs::SetMode offb_set_mode;
     offb_set_mode.request.custom_mode = "OFFBOARD";
@@ -208,8 +208,6 @@ bool wp_srv_callback(amaze_waypoint_following::wp_service::Request& req,
         rate.sleep();
       }
 
-      active_flight = true;
-
       ros::spinOnce();
       rate.sleep();
     }
@@ -233,11 +231,17 @@ bool wp_srv_callback(amaze_waypoint_following::wp_service::Request& req,
         if (land_client.call(land_cmd))
         {
           // only continue if the vehicle landed
-          if (land_cmd.response.success && (current_ext_state.landed_state == current_ext_state.LANDED_STATE_ON_GROUND))
+          if (land_cmd.response.success)
           {
             break;
           }
         }
+        ros::spinOnce();
+        rate.sleep();
+      }
+
+      while (ros::ok() && !(current_ext_state.landed_state == current_ext_state.LANDED_STATE_ON_GROUND))
+      {
         ros::spinOnce();
         rate.sleep();
       }
@@ -263,8 +267,6 @@ bool wp_srv_callback(amaze_waypoint_following::wp_service::Request& req,
       }
 
       ROS_INFO("Disarmed - Engines got turned off");
-      active_flight = false;
-
       break;
     }
     case 1:  // Absolut waypoint
