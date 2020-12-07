@@ -17,7 +17,6 @@
 
 #include <amaze_waypoint_following/wp_service.h>
 #include <geometry_msgs/PoseStamped.h>
-#include <geometry_msgs/TwistStamped.h>  //velocity control
 #include <mavros_msgs/CommandBool.h>
 #include <mavros_msgs/CommandTOL.h>
 #include <mavros_msgs/ExtendedState.h>
@@ -38,7 +37,6 @@ static ros::Subscriber state_sub_;
 static ros::Subscriber ext_state_sub_;
 // Publisher
 static ros::Publisher local_pos_pub_;
-static ros::Publisher local_pos_vel_;
 // Service client handle
 static ros::ServiceClient arming_client_;
 static ros::ServiceClient land_client_;
@@ -104,13 +102,12 @@ int main(int argc, char** argv)
   ros::Rate rate(20.0);
 
   // Create subscriber
-  current_sub_ = nh.subscribe<geometry_msgs::PoseStamped>("/mavros/local_position/pose", 10, current_pose_cb);
+  current_sub_ = nh.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 10, current_pose_cb);
   state_sub_ = nh.subscribe<mavros_msgs::State>("mavros/state", 10, state_cb);
   ext_state_sub_ = nh.subscribe<mavros_msgs::ExtendedState>("mavros/extended_state", 10, ext_state_cb);
 
   // Create publisher
   local_pos_pub_ = nh.advertise<geometry_msgs::PoseStamped>("mavros/setpoint_position/local", 10);
-  local_pos_vel_ = nh.advertise<geometry_msgs::TwistStamped>("mavros/setpoint_velocity/cmd_vel", 10);
 
   // Create service client handle
   arming_client_ = nh.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");

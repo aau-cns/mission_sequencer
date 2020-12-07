@@ -25,31 +25,37 @@ git clone git@gitlab.aau.at:aau-cns/amaze-waypoint-following.git
 ```
 
 ## Usage (waypoint_service)
+**Build the amaze waypoint following package**
+
+```sh
+catkin build amaze_waypoint_following
+```
+
 **Run the waypoint server**
 
 ```sh
-rosrun rosrun amaze_waypoint_following waypoint_service
+rosrun amaze_waypoint_following waypoint_service
 ```
 
 **Ros Topics:**
 
 The node will only send waypoints if the following messages have been received:
 
-| topic | publisher / subscriber | type | content |
-|---|---|---|---|
-| /mavros/local_position/pose | subscriber | geometry_msgs::PoseStamped | Current pose of the vehicle |
-| mavros/state | subscriber | mavros_msgs::State         | Current state of the vehicle (check if armed) |
-| mavros/extended_state | subscriber | mavros_msgs::ExtendedState | Current estended state of the vehicle (check if landed or in air) |
+| topic                      | publisher / subscriber | type                       | content                                                      |
+| -------------------------- | ---------------------- | -------------------------- | ------------------------------------------------------------ |
+| mavros/local_position/pose | subscriber             | geometry_msgs::PoseStamped | Current pose of the vehicle                                  |
+| mavros/state               | subscriber             | mavros_msgs::State         | Current state of the vehicle (check if armed)                |
+| mavros/extended_state      | subscriber             | mavros_msgs::ExtendedState | Current estended state of the vehicle (check if landed or in air) |
 
 **Additional Topics:**
 
-| topic | publisher / subscriber | type | content |
-|---|---|---|---|
-| mavros/setpoint_position/local | publisher | geometry_msgs::PoseStamped | Publishing of the waypoint |
-| mavros/cmd/arming | service client | geometry_msgs::PoseStamped | Used for arming the vehicle |
-| mavros/cmd/land | service client | mavros_msgs::CommandBool             | Used to send land comand to the vehicle |
-| mavros/set_mode | service client | mavros_msgs::CommandTOL | Used to enable the offboard mode |
-| wp_service | service server | amaze_waypoint_following::wp_service | Own service to receive waypoint requests |
+| topic                          | publisher / subscriber | type                                 | content                                  |
+| ------------------------------ | ---------------------- | ------------------------------------ | ---------------------------------------- |
+| mavros/setpoint_position/local | publisher              | geometry_msgs::PoseStamped           | Publishing of the waypoint               |
+| mavros/cmd/arming              | service client         | geometry_msgs::PoseStamped           | Used for arming the vehicle              |
+| mavros/cmd/land                | service client         | mavros_msgs::CommandBool             | Used to send land comand to the vehicle  |
+| mavros/set_mode                | service client         | mavros_msgs::CommandTOL              | Used to enable the offboard mode         |
+| wp_service                     | service server         | amaze_waypoint_following::wp_service | Own service to receive waypoint requests |
 
 ## Usage (waypoint_service_client)
 **Run the waypoint client:**
@@ -66,9 +72,9 @@ rosrun amaze_waypoint_following waypoint_service_client mode x y z yaw
 
 **Ros Topics:**
 
-| topic | publisher / subscriber | type | content |
-|---|---|---|---|
-| wp_service | service client | amaze_waypoint_following::wp_service | Requesting a waypoint |
+| topic      | publisher / subscriber | type                                 | content               |
+| ---------- | ---------------------- | ------------------------------------ | --------------------- |
+| wp_service | service client         | amaze_waypoint_following::wp_service | Requesting a waypoint |
 
 ## References
 
