@@ -1,53 +1,74 @@
+---
+title: amaze_waypoint_following
+author:
+  - Control of Networked Systems, University of Klagenfurt, Austria
+date: 07.12.2020
+subtitle: Version 1.0
 
-# Instructions to run waypoints code 1.1  
-Through this code the drone is moving through set points clarified below:  
-x=0, y=0, z=2  
-x=0, y=1, z=2    
-Then doing RTL and landing.  
+documentclass: scrartcl
+numbersections: true
 
-### Steps for launching the node:  
-1- user@user_name:~$ roscore  
-2- user@user_name:~$ source /opt/ros/melodic/setup.bash  
-3- user@user_name:~$ roslaunch mavros px4.launch fcu_url:="udp://:14540@127.0.0.1:14557"  
-4- user@user_name:~/catkin_ws2$ catkin build amaze_waypoint_following  
-5- user@user_name:~/catkin_ws2$ source devel/setup.bash  
-6- user@user_name:~/catkin_ws2$ rosrun amaze_waypoint_following amaze_waypoint_following  
+toc: true
+---
 
-Now node is already started to run.  
-If you want to make a simulation into gazebo use the following command:  
-user@user_name:~/px4/Firmware$ make px4_sitl_default gazebo  
+# Amaze Waypoint Following
 
-### Errors might be faced and solutions:  
+Waypoint service for a PX4 navigation setup including a minimal service client for comand line interaction.
 
-- INFO [dataman] Unknown restart, data manager file './dataman' size is 11798680 bytes  
-INFO [simulator] Waiting for simulator to accept connection on TCP port 4560  
-**treat it with:**  
-sudo apt upgrade libignition-math2  
-----------------------------------------
-- FAILED: external/Stamp/sitl_gazebo/sitl_gazebo-build  
-**treat it with:**  
-make clean  
-----------------------------------------
-- RLException: roscore cannot run as another roscore/master is already running. Please kill other roscore/master processes before relaunching. The ROS_MASTER_URI is http://user_name:11311/ The traceback for the exception was written to the log file  
-**treat it with:**  
-killall -9 roscore  
-killall -9 rosmaster  
-----------------------------------------
-- If you're in such a situation in which the terminal command is not ending with ctrl + c  
-**treat it with:**  
-ctrl + z  
-----------------------------------------
-- [rospack] Error: package 'amaze_waypoint_following' not found  
-**treat it with:**  
-User_name:~/catkin_ws2$ source /opt/ros/melodic/setup.bash  
-User_name:~/catkin_ws2$ source devel/setup.bash  
-----------------------------------------
-- ERROR: cannot launch node of type [mavros/mavros_node]: Cannot locate node of type  
-**treat it with:**  
-source /opt/ros/melodic/setup.bash  
-ls /opt/ros/melodic/lib/mavros // you should see mav components
+Maintainer: Christoph Böhm christoph.boehm@aau.at
 
+## Getting Started
 
+Clone the project into your workspace and build it in the ROS environment.
+```sh
+git clone git@gitlab.aau.at:aau-cns/amaze-waypoint-following.git
+```
+
+## Usage (waypoint_service)
+**Run the waypoint server**
+
+```sh
+rosrun rosrun amaze_waypoint_following waypoint_service
+```
+
+**Ros Topics:**
+
+The node will only send waypoints if the following messages have been received:
+
+| topic | publisher / subscriber | type | content |
+|---|---|---|---|
+| /mavros/local_position/pose | subscriber | geometry_msgs::PoseStamped | Current pose of the vehicle |
+| mavros/state | subscriber | mavros_msgs::State         | Current state of the vehicle (check if armed) |
+| mavros/extended_state | subscriber | mavros_msgs::ExtendedState | Current estended state of the vehicle (check if landed or in air) |
+
+**Additional Topics:**
+
+| topic | publisher / subscriber | type | content |
+|---|---|---|---|
+| mavros/setpoint_position/local | publisher | geometry_msgs::PoseStamped | Publishing of the waypoint |
+| mavros/cmd/arming | service client | geometry_msgs::PoseStamped | Used for arming the vehicle |
+| mavros/cmd/land | service client | mavros_msgs::CommandBool             | Used to send land comand to the vehicle |
+| mavros/set_mode | service client | mavros_msgs::CommandTOL | Used to enable the offboard mode |
+| wp_service | service server | amaze_waypoint_following::wp_service | Own service to receive waypoint requests |
+
+## Usage (waypoint_service_client)
+**Run the waypoint client:**
+
+```sh
+rosrun amaze_waypoint_following waypoint_service_client mode x y z yaw
+```
+
+| Parameter |                                                              |
+| --------- | ------------------------------------------------------------ |
+| mode      | **0:** Landing **1:** Absolute waypoint **2:** Relative waypoint (to be implemented) |
+| x,y,z [m] | 3D coordinates of the waypoint                               |
+| yaw [deg] | Yaw of of the Vehicle                                        |
+
+**Ros Topics:**
+
+| topic | publisher / subscriber | type | content |
+|---|---|---|---|
+| wp_service | service client | amaze_waypoint_following::wp_service | Requesting a waypoint |
 
 ## References
 
