@@ -215,8 +215,9 @@ bool wp_srv_callback(amaze_waypoint_following::wp_service::Request& req,
 
     ros::Time t_last_request = ros::Time::now();
 
-    // change to offboard mode and arm the vehicle
-    while (ros::ok() && !current_state_.armed)
+    // Change to offboard mode and arm the vehicle, only if the vehicle is not armed and the requested mode is not
+    // landing
+    while (ros::ok() && !current_state_.armed && mode != 0)
     {
       // Switch to offboard mode
       if (current_state_.mode != "OFFBOARD" && (ros::Time::now() - t_last_request) > ros::Duration(2.5))
@@ -260,6 +261,12 @@ bool wp_srv_callback(amaze_waypoint_following::wp_service::Request& req,
     // Land
     case 0:
     {
+      if (current_ext_state_.landed_state == current_ext_state_.LANDED_STATE_ON_GROUND)
+      {
+        ROS_WARN("Requested landing but vehicle is already on the ground");
+        break;
+      }
+
       mavros_msgs::CommandTOL land_cmd;
       land_cmd.request.yaw = 0;
       land_cmd.request.latitude = 0;
