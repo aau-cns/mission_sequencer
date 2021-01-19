@@ -34,10 +34,11 @@ int main(int argc, char** argv)
   amaze_waypoint_following::wp_service srv;
 
   srv.request.mode = char(atoll(argv[1]));
-  srv.request.x = atoll(argv[2]);
-  srv.request.y = atoll(argv[3]);
-  srv.request.z = atoll(argv[4]);
-  srv.request.yaw = atoll(argv[5]);
+  srv.request.x = atof(argv[2]);
+  srv.request.y = atof(argv[3]);
+  srv.request.z = atof(argv[4]);
+  srv.request.yaw = atof(argv[5]);
+  // changing atof to atoll would let the client able to request int values only
 
   if (client.call(srv))
   {
