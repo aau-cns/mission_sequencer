@@ -1,0 +1,3 @@
+<launch>
+  <node pkg="amaze_waypoint_following" type="amaze_waypoint_following" name="amaze_waypoint_following"/>
+</launch>

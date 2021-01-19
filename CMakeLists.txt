@@ -231,3 +231,7 @@ add_dependencies(waypoint_service_client amaze_waypoint_following_gencpp)
 add_executable(waypoint_service src/waypoint_service.cpp)
 target_link_libraries(waypoint_service ${catkin_LIBRARIES})
 add_dependencies(waypoint_service amaze_waypoint_following_gencpp ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+add_executable(amaze_waypoint_following src/amaze_waypoint_following.cpp)
+target_link_libraries(amaze_waypoint_following ${catkin_LIBRARIES})
+add_dependencies(amaze_waypoint_following amaze_waypoint_following_gencpp ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
