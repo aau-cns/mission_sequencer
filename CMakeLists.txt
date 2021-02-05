@@ -107,9 +107,9 @@ generate_messages(
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
+   INCLUDE_DIRS include
 #  LIBRARIES amaze_waypoint_following
- CATKIN_DEPENDS roscpp geometry_msgs mavros_msgs
+   CATKIN_DEPENDS roscpp geometry_msgs mavros_msgs
 #  DEPENDS system_lib
 )
 
@@ -127,7 +127,7 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-# include
+  include
   ${catkin_INCLUDE_DIRS}
 )
 
@@ -232,6 +232,6 @@ add_executable(waypoint_service src/waypoint_service.cpp)
 target_link_libraries(waypoint_service ${catkin_LIBRARIES})
 add_dependencies(waypoint_service amaze_waypoint_following_gencpp ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-add_executable(amaze_waypoint_following src/amaze_waypoint_following.cpp)
+add_executable(amaze_waypoint_following src/amaze_waypoint_following.cpp src/parse_waypoint.cpp)
 target_link_libraries(amaze_waypoint_following ${catkin_LIBRARIES})
 add_dependencies(amaze_waypoint_following amaze_waypoint_following_gencpp ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
