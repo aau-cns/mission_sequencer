@@ -80,9 +80,9 @@ private:
   std::vector<Waypoint> data_;
 
   /**
-  * @brief vector of strings in header ordered based on defined convention -- x,y,z,yaw,secs --
+  * @brief vector of strings in header ordered based on defined convention -- x,y,z,yaw,holdtime --
   */
-  std::vector<std::string> categories_ = {"x", "y", "z", "yaw", "secs"};
+  std::vector<std::string> categories_ = {"x", "y", "z", "yaw", "holdtime"};
 
   /**
   * @brief Parse a single line of the .csv file
@@ -115,7 +115,7 @@ private:
   /**
   * @brief Find association between input file and defined convention
   *
-  * The defined convention of the Input structure is -- x,y,z,yaw --
+  * The defined convention of the Input structure is -- x,y,z,yaw,holdtime --
   * This function find the indices of the columns of the input file based
   * on its header in order to correctly associate input data with the
   * Input structure allowing inpput files with shuffled columns or even

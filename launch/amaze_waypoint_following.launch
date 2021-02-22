@@ -1,15 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- arguments -->
-<arg name="filename"    default="../???"/>
-<arg name="mode"        default="0"/>
-
 <launch>
-  <node pkg="amaze_waypoint_following" type="amaze_waypoint_following" name="amaze_waypoint_following"/>
 
-  <param name="filename"  type="string"   value="$(arg filename)" />
-  <param name="mode"      type="int"      value="$(arg mode)" />
+    <!-- arguments -->
+    <arg name="filename"    default="$(find amaze_waypoint_following)/files/rectangular_trajectory.csv" />
+    <arg name="mode"        default="1" />
 
-  <rosparam param="header">["x" "y" "z" "yaw" "secs"]</rosparam>
+    <!-- node -->
+    <node pkg="amaze_waypoint_following" type="amaze_waypoint_following" name="amaze_waypoint_following" output="screen" clear_params="true" required="true"/>
+
+    <!-- params -->
+    <param name="filename"  type="string"   value="$(arg filename)" />
+    <param name="mode"      type="int"      value="$(arg mode)" />
+    <rosparam param="header">
+      [x, y, z, yaw]
+    </rosparam>
 
 </launch>
