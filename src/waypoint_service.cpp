@@ -216,17 +216,17 @@ bool wp_srv_callback(amaze_waypoint_following::wp_service::Request& req,
       last_request_waypoint_.pose.position.z = double(req.z) + init_pose_.pose.position.z;
 
       // Map Orientation
-      tf2::Quaternion q_wp_init;
-      q_wp_init[3] = init_pose_.pose.orientation.w;
-      q_wp_init[0] = init_pose_.pose.orientation.x;
-      q_wp_init[1] = init_pose_.pose.orientation.y;
-      q_wp_init[2] = init_pose_.pose.orientation.z;
-      q_wp_init.normalize();
+      tf2::Quaternion init_quat;
+      init_quat[3] = init_pose_.pose.orientation.w;
+      init_quat[0] = init_pose_.pose.orientation.x;
+      init_quat[1] = init_pose_.pose.orientation.y;
+      init_quat[2] = init_pose_.pose.orientation.z;
+      init_quat.normalize();
 
       // yaw (z-axis initial rotation)
-      // since there's no pitch and roll only yaw -> q_wp_init[0] = q_wp_init[1] =0
-      double siny_cosp = 2 * (q_wp_init[3] * q_wp_init[2]);
-      double cosy_cosp = 1 - 2 * (q_wp_init[2] * q_wp_init[2]);
+      // since there's no pitch and roll only yaw -> init_quat[0] = init_quat[1] =0
+      double siny_cosp = 2 * (init_quat[3] * init_quat[2]);
+      double cosy_cosp = 1 - 2 * (init_quat[2] * init_quat[2]);
       double initial_yaw = atan2(siny_cosp, cosy_cosp);
 
       double initial_yaw_degrees = initial_yaw * deg_rad_;
