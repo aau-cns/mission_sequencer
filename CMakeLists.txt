@@ -14,9 +14,13 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   geometry_msgs
-  mavros_msgs
   message_generation
+  tf2
+  tf2_geometry_msgs
 )
+find_package(mavros_msgs REQUIRED)
+
+message(WARNING "MAVROS_MSGS VERSION: " ${mavros_msgs_VERSION})
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -59,10 +63,10 @@ find_package(catkin REQUIRED COMPONENTS
 #)
 
 ## Generate services in the 'srv' folder
- add_service_files(
-   FILES
-   wp_service.srv
- )
+add_service_files(
+  FILES
+  wp_service.srv
+)
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -74,7 +78,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
   DEPENDENCIES
-   std_msgs
+  std_msgs
 )
 
 ################################################
@@ -232,6 +236,6 @@ add_executable(waypoint_service src/waypoint_service.cpp)
 target_link_libraries(waypoint_service ${catkin_LIBRARIES})
 add_dependencies(waypoint_service amaze_waypoint_following_gencpp ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-add_executable(amaze_waypoint_following src/amaze_waypoint_following.cpp src/parse_waypoint.cpp)
+add_executable(amaze_waypoint_following src/amaze_waypoint_following.cpp src/parse_waypoints.cpp)
 target_link_libraries(amaze_waypoint_following ${catkin_LIBRARIES})
 add_dependencies(amaze_waypoint_following amaze_waypoint_following_gencpp ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})

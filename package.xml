@@ -7,6 +7,7 @@
     <maintainer email="christoph.boehm@aau.at">Christoph Boehm</maintainer>
     <maintainer email="beyoglu1@yahoo.com">Hikmet Beyoglu</maintainer>
     <maintainer email="christian.brommer@ieee.com">Christian Brommer</maintainer>
+    <maintainer email="alessandro.fornasier@ieee.com">Alessandro Fornasier</maintainer>
 
     <license>MIT</license>
 
@@ -15,14 +16,19 @@
     <build_depend>message_generation</build_depend>
     <build_depend>geometry_msgs</build_depend>
     <build_depend>mavros_msgs</build_depend>
+    <build_depend>tf2</build_depend>
+    <build_depend>tf2_geometry_msgs</build_depend>
     <build_export_depend>roscpp</build_export_depend>
     <build_export_depend>geometry_msgs</build_export_depend>
     <build_export_depend>mavros_msgs</build_export_depend>
+    <build_export_depend>tf2</build_export_depend>
+    <build_export_depend>tf2_geometry_msgs</build_export_depend>
     <exec_depend>roscpp</exec_depend>
     <exec_depend>message_runtime</exec_depend>
     <exec_depend>mavros_msgs</exec_depend>
     <exec_depend>geometry_msgs</exec_depend>
-
+    <exec_depend>tf2</exec_depend>
+    <exec_depend>tf2_geometry_msgs</exec_depend>
 
     <!-- The export tag contains other, unspecified, tags -->
     <export>

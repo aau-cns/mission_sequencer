@@ -1,3 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- arguments -->
+<arg name="filename"    default="../???"/>
+<arg name="mode"        default="0"/>
+
+
 <launch>
   <node pkg="amaze_waypoint_following" type="amaze_waypoint_following" name="amaze_waypoint_following"/>
+
+  <arg name="filename"      value="$(arg filename)" />
+  <arg name="mode"          value="$(arg mode)" />
+
+  <rosparam param="header">["x" "y" "z" "yaw" "secs"]</rosparam>
+
 </launch>

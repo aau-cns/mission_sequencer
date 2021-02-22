@@ -15,7 +15,6 @@
 #include <vector>
 #include <stdexcept>
 #include <sstream>
-#include <Eigen/Eigen>
 #include <algorithm>
 
 /**
@@ -40,11 +39,12 @@ public:
   * z
   * yaw
   */
-  struct Input {
+  struct Waypoint {
     double x;
     double y;
     double z;
     double yaw;
+    double holdtime;
   };
 
   /**
@@ -53,17 +53,36 @@ public:
   ParseWaypoint();
 
   /**
-  * @brief Clear actual data, read a new .csv file and convert to a matrix (vector of vectors)
-  *
-  * @param filename
+  * @brief constructor
   */
-  void readParseCsv(const std::string filename);
+  ParseWaypoint(std::string &filename, std::vector<std::string> &categories);
 
   /**
-  * @brief Get Data red from .csv file
+  * @brief Clear actual data, read a new .csv file and convert to a matrix (vector of vectors)
   */
-  const std::vector<Input> &getData() const;
+  void readParseCsv();
 
+  /**
+  * @brief Get Data red from data structure
+  */
+  const std::vector<Waypoint> &getData() const;
+
+private:
+
+  /**
+  * @brief Filename of file containing waypoints
+  */
+  std::string filename_;
+
+  /**
+  * @brief Raw data from a .csv file converted to a matrix (vector of inputs)
+  */
+  std::vector<Waypoint> data_;
+
+  /**
+  * @brief vector of strings in header ordered based on defined convention -- x,y,z,yaw,secs --
+  */
+  std::vector<std::string> categories_ = {"x", "y", "z", "yaw", "secs"};
 
   /**
   * @brief Parse a single line of the .csv file
@@ -124,18 +143,6 @@ public:
     }
   }
 
-
-private:
-
-  /**
-  * @brief Raw data from a .csv file converted to a matrix (vector of inputs)
-  */
-  std::vector<Input> data_;
-
-  /**
-  * @brief vector of strings in header ordered based on defined convention -- x,y,z,yaw --
-  */
-  std::vector<std::string> categories_ = {"x", "y", "z", "yaw"};
 
 };
 

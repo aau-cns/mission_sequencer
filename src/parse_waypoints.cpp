@@ -3,9 +3,10 @@
  * alessandro.fornasier@aau.at
  */
 
-#include "parse_waypoint.hpp"
+#include "parse_waypoints.hpp"
 
-ParseWaypoint::ParseWaypoint() {}
+ParseWaypoint::ParseWaypoint(std::string &filename, std::vector<std::string> &categories):
+  filename_(filename), categories_(categories) {}
 
 void ParseWaypoint::getIndices(const std::vector<std::string> &header, std::vector<int> &indices) {
 
@@ -35,15 +36,15 @@ void ParseWaypoint::parseLine(std::string &line, std::vector<std::string> &data)
   }
 }
 
-void ParseWaypoint::readParseCsv(const std::string filename) {
+void ParseWaypoint::readParseCsv() {
 
-  std::ifstream file(filename);
+  std::ifstream file(filename_);
 
   if (!file) {
-    throw std::runtime_error("Error opening file \"" + filename + "\". Exit programm.");
+    throw std::runtime_error("Error opening file \"" + filename_ + "\". Exit programm.");
   }
 
-  std::cout << "\n----------------------------------------" << std::endl << "File: " << filename << " successfully open." << std::endl;
+  std::cout << "\n----------------------------------------" << std::endl << "File: " << filename_ << " successfully open." << std::endl;
 
   // Line, header and data
   std::string line;
@@ -82,15 +83,20 @@ void ParseWaypoint::readParseCsv(const std::string filename) {
     // Loop through the data (lines) and fill the data structure
     for (const auto &it : data) {
 
-      // Temporary input data structure
-      Input tmp;
+      // Temporary waypoint data structure
+      Waypoint tmp;
 
-      // Fill out temporary input data structure
+      // Fill out temporary waypoint data structure, if x,y,z,yaw are mandatory data while waiting_time not.
+      // If waiting time is not present then set it to 0
       tmp.x = it.at(indices.at(0));
-      tmp.y << it.at(indices.at(1));
-      tmp.z << it.at(indices.at(2));
-      tmp.yaw << it.at(indices.at(3));
-
+      tmp.y = it.at(indices.at(1));
+      tmp.z = it.at(indices.at(2));
+      tmp.yaw = it.at(indices.at(3));
+      if (indices.size() > 4) {
+        tmp.holdtime = it.at(indices.at(4));
+      } else {
+        tmp.holdtime = 0;
+      }
       data_.push_back(tmp);
     }
   }
@@ -99,7 +105,7 @@ void ParseWaypoint::readParseCsv(const std::string filename) {
   std::cout << "File read successfully." << std::endl << "----------------------------------------\n" << std::endl;
 }
 
-const std::vector<ParseWaypoint::Input> &ParseWaypoint::getData() const {
+const std::vector<ParseWaypoint::Waypoint> &ParseWaypoint::getData() const {
   if(!data_.empty()) {
     return data_;
   } else {
