@@ -159,6 +159,33 @@ int main(int argc, char* argv[])
   ros::Publisher local_pos_vel = nh.advertise<geometry_msgs::TwistStamped>("/mavros/setpoint_velocity/cmd_vel", 10);
   ros::Subscriber ext_state_sub_ = nh.subscribe<mavros_msgs::ExtendedState>("mavros/extended_state", 10, ext_state_cb);
 
+  // Read parameters from launchfile
+  std::string filename;
+  int mode;
+  std::vector<std::string> header;
+  std::vector<std::string> header_default = {"x", "y", "z", "yaw", "secs"};
+
+  if(!nh.getParam("filename", filename)) {
+    std::cout << std::endl;
+    ROS_ERROR("Waypoint filename missing!");
+    std::exit(EXIT_FAILURE);
+  }
+
+  if(!nh.getParam("mode", mode)) {
+    std::cout << std::endl;
+    ROS_ERROR("Mission mode missing!");
+    std::exit(EXIT_FAILURE);
+  }
+
+  nh.param<std::vector<std::string>>("header", header, header_default);
+
+  // DEBUG:
+  for (const auto &it : header) {
+    std::cout << "[DEBUG]" << it << std::endl;
+  }
+
+  // -------------------------- IM HERE ------------------------------ //
+
   // the setpoint publishing rate MUST be faster than 2Hz
   ros::Rate rate(20.0);
 

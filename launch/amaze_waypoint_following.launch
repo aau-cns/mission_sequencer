@@ -4,12 +4,11 @@
 <arg name="filename"    default="../???"/>
 <arg name="mode"        default="0"/>
 
-
 <launch>
   <node pkg="amaze_waypoint_following" type="amaze_waypoint_following" name="amaze_waypoint_following"/>
 
-  <arg name="filename"      value="$(arg filename)" />
-  <arg name="mode"          value="$(arg mode)" />
+  <param name="filename"  type="string"   value="$(arg filename)" />
+  <param name="mode"      type="int"      value="$(arg mode)" />
 
   <rosparam param="header">["x" "y" "z" "yaw" "secs"]</rosparam>
 
