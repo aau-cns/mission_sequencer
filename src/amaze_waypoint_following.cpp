@@ -58,8 +58,8 @@ void ext_state_cb(const mavros_msgs::ExtendedState::ConstPtr& msg)
   ext_state_msg_ok_ = true;
 }
 
-// tolerance of achieving waypoint =20cm
-static double threshold_wp_reached_ = 0.2;
+// tolerance of achieving waypoint = 20cm
+static double threshold_wp_reached_ = 0.1;
 
 // degrees to radians transformation constant
 static double deg_rad_ = M_PI / 180.0;
@@ -99,6 +99,14 @@ int main(int argc, char* argv[])
     ROS_ERROR("Mission mode missing!");
     std::exit(EXIT_FAILURE);
   }
+  ROS_INFO("Mode: %d", mode);
+
+  if(!nh.getParam("wp_threshold", threshold_wp_reached_)) {
+    std::cout << std::endl;
+    ROS_WARN("No Waypoint threshold defined, Taking 0.1 by default");
+  }
+  ROS_INFO("Selected waypoint threshold: %f", threshold_wp_reached_);
+
 
   nh.param<std::vector<std::string>>("header", header, header_default);
 
@@ -121,25 +129,29 @@ int main(int argc, char* argv[])
   std::vector<ParseWaypoint::Waypoint> waypoints;
   waypoints = WaypointParser->getData();
 
-  // DEBUG
-  for (const auto &it : waypoints) {
-    std::cout << "[DEBUG] Print waypoint: " << it.x << ", " << it.y << ", " << it.z << ", " << it.yaw << ", " << it.holdtime << ", " << std::endl;
-  }
+//  // DEBUG
+//  for (const auto &it : waypoints) {
+//    std::cout << "[DEBUG] Print waypoint: " << it.x << ", " << it.y << ", " << it.z << ", " << it.yaw << ", " << it.holdtime << std::endl;
+//  }
 
-  // wait for FCU connection
+  // Wait for FCU connection
+  std::cout << std::endl << "connecting to FCT..." << std::endl << std::endl;
   while (ros::ok() && !current_state.connected)
   {
     ros::spinOnce();
     rate.sleep();
-    ROS_INFO("connecting to FCT...");
   }
 
+  // Wait for a valid pose
+  std::cout << "Wait for valid init pose..." << std::endl << std::endl;
   while (pose_ok == false)
   {
     ros::spinOnce();
     rate.sleep();
-    ROS_INFO("Wait for valid init pose...");
   }
+  std::cout << "Got a valid init pose" << std::endl;
+  std::cout << "Init pose p(x,y,z): " << current_pose.pose.position.x << ", " << current_pose.pose.position.y << ", " << current_pose.pose.position.z << std::endl;
+  std::cout << "Init pose q(x,y,z,w): " << current_pose.pose.orientation.x << ", " << current_pose.pose.orientation.y << ", " << current_pose.pose.orientation.z << ", " << current_pose.pose.orientation.w << std::endl << std::endl;
 
   // Initial pose adn quaternion
   geometry_msgs::PoseStamped init_pose(current_pose);
@@ -202,10 +214,10 @@ int main(int argc, char* argv[])
   {
     if (current_state.mode != "OFFBOARD" && (ros::Time::now() - Offboard_request_time > ros::Duration(2.5)))
     {
-      ROS_INFO(current_state.mode.c_str());
+      std::cout << "Actual mode: " << current_state.mode.c_str() << std::endl;
       if (set_mode_client.call(offb_set_mode) && offb_set_mode.response.mode_sent)
       {
-        ROS_INFO("Offboard enabled");
+        std::cout << "Offboard enabled" << std::endl;
       }
       Offboard_request_time = ros::Time::now();
     }
@@ -215,7 +227,7 @@ int main(int argc, char* argv[])
       {
         if (arming_client.call(arm_cmd) && arm_cmd.response.success)
         {
-          ROS_INFO("Vehicle armed");
+          std::cout << "Vehicle armed" << std::endl << std::endl;
         }
         Arm_request_time = ros::Time::now();
       }
@@ -225,12 +237,22 @@ int main(int argc, char* argv[])
     rate.sleep();
   }
 
+  // Check everything is ok before setting waypoints
+  std::cout << "Vehicle armed and offboard mode enabled... Press any key to continue within 10 seconds" << std::endl;
+  std::cin.ignore();
+
+  // Waypoint counter
+  int waypoint_cnt = 1;
+
   // Loop through waypoints
   for (const auto &it : waypoints) {
 
+    // Bolean to check if waypoint is reached
+    bool reached = false;
+
     // Print infos
     std::cout << "Setting waypoint [x: " << it.x << ", y: " << it.y << ", z: " << it.z << ", yaw: " << it.yaw << "]" << std::endl;
-    std::cout << "Setting holdtime: " << it.holdtime << std::endl;
+    std::cout << "Setting holdtime: " << it.holdtime << " s" << std::endl << std::endl;
 
     // Convert yaw to radians
     double yaw_rad = it.yaw * deg_rad_;
@@ -274,23 +296,34 @@ int main(int argc, char* argv[])
           abs(pose.pose.position.y - current_pose.pose.position.y) < threshold_wp_reached_ &&
           abs(pose.pose.position.z - current_pose.pose.position.z) < threshold_wp_reached_) {
 
-        // Set the time when the waypoint got reached
-        Waypoint_reached_time = ros::Time::now();
+        // Set the time when the waypoint got reached and the reached flag
+        if (!reached) {
 
-        std::cout << "Reached waypoint [x: " << it.x << ", y: " << it.y << ", z: " << it.z << ", yaw: " << it.yaw << "]" << std::endl;
-        std::cout << "Hold waypoint for: " << it.holdtime << "s" << std::endl;
+          // print info
+          std::cout << "Reached waypoint [x: " << it.x << ", y: " << it.y << ", z: " << it.z << ", yaw: " << it.yaw << "]" << std::endl;
+          std::cout << "Hold waypoint for: " << it.holdtime << " s" << std::endl;
 
-        // Break the loop after holding the waypoint
-        if ((ros::Time::now() - Waypoint_reached_time) > ros::Duration(it.holdtime))
-        {
-          break;
+          // Set time and flag
+          Waypoint_reached_time = ros::Time::now();
+          reached = true;
         }
 
+        // Break the loop after holding the waypoint
+        if ((ros::Time::now() - Waypoint_reached_time) > ros::Duration(it.holdtime)) {
+          std::cout << "Waypoint Helded for: " << it.holdtime << " s" << std::endl << std::endl;
+          break;
+        }
       }
 
       ros::spinOnce();
       rate.sleep();
     }
+
+    // Print waypoints still to fly
+    std::cout << "Number of waypoint that have still to be reached: " << waypoints.size() - waypoint_cnt << std::endl << std::endl;
+
+    // Increase waypoint counter
+    ++waypoint_cnt;
   }
 
   // land
@@ -314,11 +347,11 @@ int main(int argc, char* argv[])
     rate.sleep();
   }
 
-  ROS_INFO("Vehicle landed");
+  std::cout << "Vehicle landed" << std::endl;
 
   arm_cmd.request.value = false;
 
-  ROS_INFO("Disarming...");
+  std::cout << "Disarming..." << std::endl;
 
   while (ros::ok())
   {
@@ -332,7 +365,7 @@ int main(int argc, char* argv[])
     ros::spinOnce();
     rate.sleep();
   }
-  ROS_INFO("Disarmed - Engines got turned off");
+  std::cout << "Disarmed - Engines got turned off" << std::endl;
 
   return 0;
 }
