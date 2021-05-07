@@ -1,8 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(amaze_waypoint_following)
-
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_LIST_DIR}/cmake")
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+project(amaze_mission_sequencer)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 add_compile_options(-std=c++11)
@@ -13,14 +10,11 @@ add_compile_options(-std=c++11)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
-  geometry_msgs
+  std_msgs
+  # geometry_msgs
+  mavros_msgs
   message_generation
-  tf2
-  tf2_geometry_msgs
 )
-find_package(mavros_msgs REQUIRED)
-
-message(WARNING "MAVROS_MSGS VERSION: " ${mavros_msgs_VERSION})
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -56,17 +50,18 @@ message(WARNING "MAVROS_MSGS VERSION: " ${mavros_msgs_VERSION})
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-#add_message_files(
-#  FILES
-#   Message1.msg
-#   Message2.msg
-#)
+add_message_files(
+  FILES
+  request.msg
+  response.msg
+)
 
 ## Generate services in the 'srv' folder
-add_service_files(
-  FILES
-  wp_service.srv
-)
+# add_service_files(
+#   FILES
+#   Service1.srv
+#   Service2.srv
+# )
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -111,18 +106,11 @@ generate_messages(
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-   INCLUDE_DIRS include
-#  LIBRARIES amaze_waypoint_following
-   CATKIN_DEPENDS roscpp geometry_msgs mavros_msgs
+#  INCLUDE_DIRS include
+#  LIBRARIES amaze_mission_sequencer
+ CATKIN_DEPENDS roscpp rospy std_msgs mavros_msgs
 #  DEPENDS system_lib
 )
-
-#set(AMAZE_SOURCE_FILES
-#    src/amaze_waypoint_following.cpp
-#)
-#set(AMAZE_HEADER_FILES
-#    include/amaze_waypoint_following.h
-#)
 
 ###########
 ## Build ##
@@ -131,22 +119,14 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-  include
+  include/amaze_mission_sequencer
   ${catkin_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
-#add_library(${PROJECT_NAME}
-#  src/${PROJECT_NAME}/src/amaze_waypoint_following.cpp
-#)
-#add_library(amaze_waypoint_following_lib ${AMAZE_SOURCE_FILES})
-#target_link_libraries(amaze_waypoint_following_lib ${catkin_LIBRARIES})
-#add_executable(amaze_waypoint_following  src/amaze_waypoint_following.cpp)
-#add_dependencies(amaze_waypoint_following ${catkin_EXPORTED_TARGETS} )
-#target_link_libraries(amaze_waypoint_following amaze_waypoint_following_lib ${catkin_LIBRARIES})
-
-
-
+# add_library(${PROJECT_NAME}
+#   src/${PROJECT_NAME}/amaze-mission-sequencer.cpp
+# )
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -156,7 +136,7 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-# add_executable(${PROJECT_NAME}_node src/amaze_waypoint_following.cpp)
+add_executable(${PROJECT_NAME}_node src/amaze_mission_sequencer_node.cpp src/amaze_mission_sequencer src/parse_waypoints)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -169,9 +149,9 @@ include_directories(
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(${PROJECT_NAME}_node
-#   ${catkin_LIBRARIES}
-# )
+target_link_libraries(${PROJECT_NAME}_node
+  ${catkin_LIBRARIES}
+)
 
 #############
 ## Install ##
@@ -220,22 +200,10 @@ include_directories(
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_amaze_waypoint_following.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_amaze-mission-sequencer.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
-
-add_executable(waypoint_service_client src/waypoint_service_client.cpp)
-target_link_libraries(waypoint_service_client ${catkin_LIBRARIES})
-add_dependencies(waypoint_service_client amaze_waypoint_following_gencpp)
-
-add_executable(waypoint_service src/waypoint_service.cpp)
-target_link_libraries(waypoint_service ${catkin_LIBRARIES})
-add_dependencies(waypoint_service amaze_waypoint_following_gencpp ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
-add_executable(amaze_mission_sequencer src/amaze_mission_sequencer.cpp src/parse_waypoints.cpp)
-target_link_libraries(amaze_mission_sequencer ${catkin_LIBRARIES})
-add_dependencies(amaze_mission_sequencer amaze_mission_sequencer_gencpp ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})

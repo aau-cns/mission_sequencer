@@ -1,21 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <launch>
-
-    <!-- arguments -->
-    <arg name="filename"            default="$(find amaze_waypoint_following)/files/spiral_trajectory.csv" />
-    <arg name="mode"                default="1" />
-    <arg name="wp_threshold"        default="0.3" />
-
-    <!-- node -->
-    <node pkg="amaze_waypoint_following" type="amaze_waypoint_following" name="amaze_waypoint_following" output="screen" clear_params="true" required="true"/>
-
-    <!-- params -->
-    <param name="filename"          type="string"       value="$(arg filename)" />
-    <param name="mode"              type="int"          value="$(arg mode)" />
-    <param name="wp_threshold"      type="double"       value="$(arg wp_threshold)" />
-    <rosparam param="header">
-      [x, y, z, yaw]
-    </rosparam>
-
+  <!-- node -->
+  <node pkg="amaze_waypoint_following" type="amaze_waypoint_following" name="amaze_waypoint_following" output="screen" clear_params="true" required="true">
+    <remap from="/fuse_node/motor_speeds" to="/hummingbird/motor_speed"/>
+  </node>
 </launch>

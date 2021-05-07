@@ -1,4 +1,4 @@
-Copyright 2021 University of Klagenfurt - Control of Networked Systems (CNS)
+Copyright 2021-2022 University of Klagenfurt - Control of Networked Systems (CNS)
 
 BSD-2 with additional conditions
 
@@ -24,7 +24,7 @@ No express or implied license in any of the Licensor's patents is granted nor
 shall any of the provisions of the License be construed in such way. Any license
 notice or attribution required by the License must also include this notice.
 
-Software: amaze_mission_sequencer
+Software: mission_sequencer
 License: BSD-2-Clause
 Licensor: University of Klagenfurt - Control of Networked Systems (CNS)
 
@@ -51,5 +51,3 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
 ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-
