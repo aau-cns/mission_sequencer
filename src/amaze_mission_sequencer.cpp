@@ -111,7 +111,8 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
                 this->missionID_ = int(msg->id);
 
                 // Define waypoint parser
-                std::string filename = "/home/chriboehm/workspaces/mission_ws/src/amaze_mission_sequencer/trajectories/test_trajectory.csv";
+                // std::string filename = "/home/chriboehm/workspaces/mission_ws/src/amaze_mission_sequencer/trajectories/test_trajectory.csv";
+                std::string filename = "/home/core/catkin_ws/src/amaze_mission_sequencer/trajectories/test_trajectory.csv";
                 std::vector<std::string> header_default = {"x", "y", "z", "yaw"};
                 std::shared_ptr<ParseWaypoint> WaypointParser =  std::make_shared<ParseWaypoint>(filename, header_default);
 
@@ -267,11 +268,10 @@ void AmazeMissionSequencer::logic(void)
                 geometry_msgs::PoseStamped currentWaypoint = this->waypointToPoseStamped(this->waypointList_[0]);
                 this->vehiclePoseSetpoint_ = currentWaypoint;
 
-                double difference = abs(this->currentVehiclePose_.pose.position.x - currentWaypoint.pose.position.x) +
-                                          abs(this->currentVehiclePose_.pose.position.y - currentWaypoint.pose.position.y) +
-                                          abs(this->currentVehiclePose_.pose.position.z - currentWaypoint.pose.position.z);
-
-                differencePosition = sqrt(difference*difference);
+                double differenceSquared =  pow(abs(this->currentVehiclePose_.pose.position.x - currentWaypoint.pose.position.x), 2) +
+                                            pow(abs(this->currentVehiclePose_.pose.position.y - currentWaypoint.pose.position.y), 2) +
+                                            pow(abs(this->currentVehiclePose_.pose.position.z - currentWaypoint.pose.position.z), 2);
+                differencePosition = sqrt(differenceSquared);
                 // std::cout << differencePosition << std::endl;
 
                 differenceYaw = 2.0*double(tf2::Quaternion(this->currentVehiclePose_.pose.orientation.x, this->currentVehiclePose_.pose.orientation.y,this->currentVehiclePose_.pose.orientation.z, this->currentVehiclePose_.pose.orientation.w).angle(tf2::Quaternion(currentWaypoint.pose.orientation.x, currentWaypoint.pose.orientation.y, currentWaypoint.pose.orientation.z, currentWaypoint.pose.orientation.w)));
@@ -290,22 +290,23 @@ void AmazeMissionSequencer::logic(void)
             }
             else
             {
-                ROS_INFO("Landing");
-                this->currentFollowerState_ = LAND;
+                if (this->rosServiceLand_.call(this->landCmd_))
+                {
+                    if (this->landCmd_.response.success)
+                    {
+                        ROS_INFO("Landing");
+                        this->currentFollowerState_ = LAND;
+                    }
+                }
             }              
             break;
         
         case LAND:
-            if (this->rosServiceLand_.call(this->landCmd_))
+            if (this->currentExtendedVehicleState_.landed_state == this->currentExtendedVehicleState_.LANDED_STATE_ON_GROUND)
             {
-                // only continue if the vehicle landed
-                // TODO: CHECK IF LANDED ON GROUND IS THE ISSUE
-                if (this->landCmd_.response.success && (this->currentExtendedVehicleState_.landed_state == this->currentExtendedVehicleState_.LANDED_STATE_ON_GROUND))
-                {
-                    ROS_INFO("Landed");
-                    this->armCmd_.request.value = false;
-                    this->currentFollowerState_ = DISARM;
-                }
+                ROS_INFO("Landed");
+                this->armCmd_.request.value = false;
+                this->currentFollowerState_ = DISARM;
             }
             break;
         
