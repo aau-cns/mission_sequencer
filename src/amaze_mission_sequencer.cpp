@@ -267,9 +267,11 @@ void AmazeMissionSequencer::logic(void)
                 geometry_msgs::PoseStamped currentWaypoint = this->waypointToPoseStamped(this->waypointList_[0]);
                 this->vehiclePoseSetpoint_ = currentWaypoint;
 
-                differencePosition = sqrt(abs(this->currentVehiclePose_.pose.position.x - currentWaypoint.pose.position.x) +
+                double difference = abs(this->currentVehiclePose_.pose.position.x - currentWaypoint.pose.position.x) +
                                           abs(this->currentVehiclePose_.pose.position.y - currentWaypoint.pose.position.y) +
-                                          abs(this->currentVehiclePose_.pose.position.z - currentWaypoint.pose.position.z));
+                                          abs(this->currentVehiclePose_.pose.position.z - currentWaypoint.pose.position.z);
+
+                differencePosition = sqrt(difference*difference);
                 // std::cout << differencePosition << std::endl;
 
                 differenceYaw = 2.0*double(tf2::Quaternion(this->currentVehiclePose_.pose.orientation.x, this->currentVehiclePose_.pose.orientation.y,this->currentVehiclePose_.pose.orientation.z, this->currentVehiclePose_.pose.orientation.w).angle(tf2::Quaternion(currentWaypoint.pose.orientation.x, currentWaypoint.pose.orientation.y, currentWaypoint.pose.orientation.z, currentWaypoint.pose.orientation.w)));
