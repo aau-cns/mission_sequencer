@@ -168,6 +168,14 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
             break;
         case 4:
             ROS_INFO("Abort Mission - Landing");
+            if (this->rosServiceLand_.call(this->landCmd_))
+            {
+                if (this->landCmd_.response.success)
+                {
+                    ROS_INFO("Landing");
+                    this->currentFollowerState_ = LAND;
+                }
+            }
             this->currentFollowerState_ = LAND;
 
                 // Respond that mission starts
