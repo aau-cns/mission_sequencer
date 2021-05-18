@@ -111,8 +111,8 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
                 this->missionID_ = int(msg->id);
 
                 // Define waypoint parser
-                // std::string filename = "/home/chriboehm/workspaces/mission_ws/src/amaze_mission_sequencer/trajectories/test_trajectory.csv";
-                std::string filename = "/home/core/catkin_ws/src/amaze_mission_sequencer/trajectories/test_trajectory.csv";
+                std::string filename = "/home/chriboehm/workspaces/mission_ws/src/amaze_mission_sequencer/trajectories/test_trajectory.csv";
+                // std::string filename = "/home/core/catkin_ws/src/amaze_mission_sequencer/trajectories/test_trajectory.csv";
                 std::vector<std::string> header_default = {"x", "y", "z", "yaw"};
                 std::shared_ptr<ParseWaypoint> WaypointParser =  std::make_shared<ParseWaypoint>(filename, header_default);
 
@@ -210,21 +210,31 @@ geometry_msgs::PoseStamped AmazeMissionSequencer::waypointToPoseStamped(const Pa
 {
     geometry_msgs::PoseStamped pose;
     
-    pose.pose.position.x = waypoint.x + double(this->relWaypoints_)*this->startingVehiclePose_.pose.position.x;
-    pose.pose.position.y = waypoint.y + double(this->relWaypoints_)*this->startingVehiclePose_.pose.position.y;
-    pose.pose.position.z = waypoint.z + double(this->relWaypoints_)*this->startingVehiclePose_.pose.position.z;
+    pose.pose.position.x = waypoint.x;
+    pose.pose.position.y = waypoint.y;
+    pose.pose.position.z = waypoint.z;
     
-    tf2::Quaternion quaternion;
-    quaternion.setRotation(tf2::Vector3(0, 0, 1), waypoint.yaw*DEG_TO_RAD);
-    quaternion.normalize();
+    tf2::Quaternion waypointQuaternion;
+    waypointQuaternion.setRotation(tf2::Vector3(0, 0, 1), waypoint.yaw*DEG_TO_RAD);
+    waypointQuaternion.normalize();
     if (this->relWaypoints_)
     {
-        quaternion = tf2::Quaternion(this->startingVehiclePose_.pose.orientation.x, this->startingVehiclePose_.pose.orientation.y,this->startingVehiclePose_.pose.orientation.z, this->startingVehiclePose_.pose.orientation.w) * quaternion;
+        tf2::Quaternion startingQuaternion(this->startingVehiclePose_.pose.orientation.x, this->startingVehiclePose_.pose.orientation.y,this->startingVehiclePose_.pose.orientation.z, this->startingVehiclePose_.pose.orientation.w);
+
+        waypointQuaternion = startingQuaternion * waypointQuaternion;
+        
+        double startingYaw, startingPitch, startingRoll;
+        tf2::Matrix3x3(startingQuaternion).getEulerYPR(startingYaw, startingPitch, startingRoll);
+        
+        pose.pose.position.x = (waypoint.x*cos(startingYaw) - waypoint.y*sin(startingYaw)) + this->startingVehiclePose_.pose.position.x;
+        pose.pose.position.y = (waypoint.x*sin(startingYaw) + waypoint.y*cos(startingYaw)) + this->startingVehiclePose_.pose.position.y;
+        pose.pose.position.z = waypoint.z + this->startingVehiclePose_.pose.position.z;
     }    
-    pose.pose.orientation.x = quaternion[0];
-    pose.pose.orientation.y = quaternion[1];
-    pose.pose.orientation.z = quaternion[2];
-    pose.pose.orientation.w = quaternion[3];
+
+    pose.pose.orientation.x = waypointQuaternion[0];
+    pose.pose.orientation.y = waypointQuaternion[1];
+    pose.pose.orientation.z = waypointQuaternion[2];
+    pose.pose.orientation.w = waypointQuaternion[3];
 
     return pose;
 };
@@ -280,14 +290,14 @@ void AmazeMissionSequencer::logic(void)
                                             pow(abs(this->currentVehiclePose_.pose.position.y - currentWaypoint.pose.position.y), 2) +
                                             pow(abs(this->currentVehiclePose_.pose.position.z - currentWaypoint.pose.position.z), 2);
                 differencePosition = sqrt(differenceSquared);
-                // std::cout << differencePosition << std::endl;
+                // std::cout << "Pos: " << differencePosition << std::endl;
 
                 differenceYaw = 2.0*double(tf2::Quaternion(this->currentVehiclePose_.pose.orientation.x, this->currentVehiclePose_.pose.orientation.y,this->currentVehiclePose_.pose.orientation.z, this->currentVehiclePose_.pose.orientation.w).angle(tf2::Quaternion(currentWaypoint.pose.orientation.x, currentWaypoint.pose.orientation.y, currentWaypoint.pose.orientation.z, currentWaypoint.pose.orientation.w)));
                 if (differenceYaw > M_PI)
                 {
                     differenceYaw -= 2.0*M_PI;
                 }                
-                // std::cout << differenceYaw << std::endl;
+                // std::cout << "Yaw: " << differenceYaw << std::endl;
 
                 if (differencePosition<this->thresholdPosition_ && abs(differenceYaw)<this->thresholdYaw_)
                 {
@@ -326,7 +336,7 @@ void AmazeMissionSequencer::logic(void)
                     ROS_INFO("Disarmed");
                     this->currentFollowerState_ = IDLE;
 
-                    // Respond that mission starts
+                    // Respond that mission succefully finished
                     this->publishResponse(this->missionID_, false, true);
                 }
             }
