@@ -34,6 +34,10 @@ static const char *StateStr[] = { "IDLE", "ARM", "MISSION", "HOLD", "LAND", "DIS
 class AmazeMissionSequencer
 {
 private:
+
+    /// Nodehandler
+    ros::NodeHandle nh_;
+
     mavros_msgs::State currentVehicleState_;
     mavros_msgs::ExtendedState currentExtendedVehicleState_;
     geometry_msgs::PoseStamped currentVehiclePose_;
@@ -75,6 +79,9 @@ private:
     ros::ServiceClient rosServiceLand_;
     ros::ServiceClient rosServiceSetMode_;
 
+    /// vector of filenames read from parameter server
+    std::vector<std::string> filenames_;
+
     void rosVehicleStateCallback(const mavros_msgs::State::ConstPtr& msg);
     void rosExtendedVehicleStateCallback(const mavros_msgs::ExtendedState::ConstPtr& msg);
     void rosPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
@@ -83,6 +90,8 @@ private:
     void publishResponse(int id, bool response, bool completed);
 
     geometry_msgs::PoseStamped waypointToPoseStamped(const ParseWaypoint::Waypoint& waypoint);
+
+    bool getFilenames();
 
 public:
     AmazeMissionSequencer(ros::NodeHandle &nh);

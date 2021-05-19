@@ -13,7 +13,8 @@
 #include "amaze_mission_sequencer.h"
 
 
-AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle &nh)
+AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle &nh) :
+  nh_(nh)
 {
     this->currentVehicleState_ = mavros_msgs::State();
     this->currentExtendedVehicleState_ = mavros_msgs::ExtendedState();
@@ -99,20 +100,63 @@ void AmazeMissionSequencer::rosPoseCallback(const geometry_msgs::PoseStamped::Co
     this->currentVehiclePose_ = *msg;
 };
 
+
+bool AmazeMissionSequencer::getFilenames() {
+
+  // Define filepaths
+  XmlRpc::XmlRpcValue filepaths;
+
+  // get filepaths
+  if (!nh_.getParam("missions/mission_" + std::to_string(missionID_) + "/filepaths", filepaths)) {
+
+    // [TODO] Manage error
+    return false;
+  }
+
+  // Check type to be array
+  if (filepaths.getType() ==  XmlRpc::XmlRpcValue::TypeArray) {
+
+    // Loop through filepaths
+    for (int j = 0; j < filepaths.size(); ++j) {
+
+
+      // Check type to be string
+      if (filepaths[j].getType() ==  XmlRpc::XmlRpcValue::TypeString) {
+
+        // assign filename
+        filenames_.emplace_back(std::string(filepaths[j]));
+
+        return true;
+      }
+    }
+  } else {
+
+    // [TODO] Manage error
+    return false;
+  }
+}
+
 void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::request::ConstPtr& msg)
 {
-    bool wrongInput = false;    
+    bool wrongInput = false;
+
+    // Get mission id
+    this->missionID_ = int(msg->id);
+
+    // Get filepaths
+    if (!getFilenames()) {
+      // [TODO] Manage error
+    }
+
+    // [TODO] Temporary we use only the first filename of filenames
+    //        Here a logic to handle multiple filenames shuld be implemented
+    std::string filename = filenames_[0];
 
     switch (int(msg->request))
     {
         case 1:
             if (this->currentFollowerState_ == IDLE && this->poseValid_ && this->stateValid_ && this->extendedStateValid_)
             {
-                this->missionID_ = int(msg->id);
-
-                // Define waypoint parser
-                std::string filename = "/home/chriboehm/workspaces/mission_ws/src/amaze_mission_sequencer/trajectories/test_trajectory.csv";
-                // std::string filename = "/home/core/catkin_ws/src/amaze_mission_sequencer/trajectories/test_trajectory.csv";
                 std::vector<std::string> header_default = {"x", "y", "z", "yaw"};
                 std::shared_ptr<ParseWaypoint> WaypointParser =  std::make_shared<ParseWaypoint>(filename, header_default);
 
@@ -185,6 +229,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
             ROS_ERROR("REQUEST NOT DEFINED");
             break;
     }
+
     if (wrongInput)
     {
         ROS_INFO_STREAM("WRONG REQUEST FOR CURRENT STATE: " << StateStr[this->currentFollowerState_]);
