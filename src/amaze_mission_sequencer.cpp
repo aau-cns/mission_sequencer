@@ -359,6 +359,9 @@ void AmazeMissionSequencer::logic(void)
                     {
                         ROS_INFO("Landing");
                         this->currentFollowerState_ = LAND;
+
+			 // Respond that mission succefully finished
+			 this->publishResponse(this->missionID_, false, true);
                     }
                 }
             }              
@@ -380,9 +383,6 @@ void AmazeMissionSequencer::logic(void)
                 {
                     ROS_INFO("Disarmed");
                     this->currentFollowerState_ = IDLE;
-
-                    // Respond that mission succefully finished
-                    this->publishResponse(this->missionID_, false, true);
                 }
             }
             break;
