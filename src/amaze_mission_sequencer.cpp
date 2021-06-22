@@ -29,6 +29,8 @@ AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle &nh) :
     this->currentFollowerState_ = IDLE;
 
     waypointList_ = std::vector<ParseWaypoint::Waypoint>(0);
+    this->reachedWaypoint_ = false;
+    this->reachedWaypointTime_ = ros::Time::now();
 
     this->offboardMode_.request.custom_mode = "OFFBOARD";
     this->armCmd_.request.value = true;
@@ -157,7 +159,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
         case 1:
             if (this->currentFollowerState_ == IDLE && this->poseValid_ && this->stateValid_ && this->extendedStateValid_)
             {
-                std::vector<std::string> header_default = {"x", "y", "z", "yaw"};
+                std::vector<std::string> header_default = {"x", "y", "z", "yaw", "holdtime"};
                 std::shared_ptr<ParseWaypoint> WaypointParser =  std::make_shared<ParseWaypoint>(filename, header_default);
 
                 // Parse waypoint file
@@ -166,6 +168,10 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
 
                 // Get the data
                 this->waypointList_ = WaypointParser->getData();
+
+                // Set initial pose
+                this->startingVehiclePose_ = this->currentVehiclePose_;
+                this->vehiclePoseSetpoint_ = this->startingVehiclePose_;
 
                 // Preparation for arming
                 this->armCmd_.request.value = true;
@@ -320,12 +326,13 @@ void AmazeMissionSequencer::logic(void)
                 ROS_INFO("Taking off");
                 // Publish response of start
                 this->currentFollowerState_ = MISSION;
+                this->reachedWaypoint_ = false;
             }            
             break;
         
         case MISSION:
             if (this->waypointList_.size() != 0)
-            {
+            {                
                 double differencePosition;
                 double differenceYaw;
                 geometry_msgs::PoseStamped currentWaypoint = this->waypointToPoseStamped(this->waypointList_[0]);
@@ -343,12 +350,19 @@ void AmazeMissionSequencer::logic(void)
                     differenceYaw -= 2.0*M_PI;
                 }                
                 // std::cout << "Yaw: " << differenceYaw << std::endl;
-
-                if (differencePosition<this->thresholdPosition_ && abs(differenceYaw)<this->thresholdYaw_)
+                if (!this->reachedWaypoint_ && differencePosition<this->thresholdPosition_ && abs(differenceYaw)<this->thresholdYaw_)
                 {
                     ROS_INFO_STREAM("Reached Waypoint: x = " << this->waypointList_[0].x << ", y = " << this->waypointList_[0].y << ", z = " << this->waypointList_[0].z << ", yaw = " << this->waypointList_[0].yaw);
+                    this->reachedWaypoint_ = true;
+                    this->reachedWaypointTime_ = ros::Time::now();
+                } 
+
+                if (this->reachedWaypoint_ && (ros::Time::now() - this->reachedWaypointTime_)>ros::Duration(this->waypointList_[0].holdtime) )
+                {
+                    ROS_INFO_STREAM("Waited for: " << this->waypointList_[0].holdtime << " Seconds");
                     this->waypointList_.erase(this->waypointList_.begin());
                     this->vehiclePoseSetpoint_ = this->waypointToPoseStamped(this->waypointList_[0]);
+                    this->reachedWaypoint_ = false;
                 }        
             }
             else

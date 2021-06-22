@@ -51,6 +51,8 @@ private:
     State currentFollowerState_;
 
     std::vector<ParseWaypoint::Waypoint> waypointList_;
+    bool reachedWaypoint_;
+    ros::Time reachedWaypointTime_;
 
     mavros_msgs::SetMode offboardMode_;
     mavros_msgs::CommandBool armCmd_;
