@@ -1,9 +1,9 @@
 Header header
 
-#id is the number of the mission
-uint8 id 
+# request
+amaze_mission_sequencer/request request
 
-# response (True, False)
+# response to request (True, False)
 bool response
 
 # mission succesfully completed (True, False)

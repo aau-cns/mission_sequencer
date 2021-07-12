@@ -80,6 +80,7 @@
 		"python.analysis.extraPaths": [
 			"/home/chriboehm/workspaces/mission_ws/devel/lib/python3/dist-packages",
 			"/opt/ros/noetic/lib/python3/dist-packages"
-		]
+		],
+		"ros.distro": "noetic"
 	}
 }

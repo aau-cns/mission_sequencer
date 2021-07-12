@@ -145,18 +145,19 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
     // Get mission id
     this->missionID_ = int(msg->id);
 
+    // TODO: This is read mission case later
     // Get filepaths
     if (!getFilenames()) {
       // [TODO] Manage error
     }
-
     // [TODO] Temporary we use only the first filename of filenames
     //        Here a logic to handle multiple filenames shuld be implemented
     std::string filename = filenames_[0];
 
     switch (int(msg->request))
     {
-        case 1:
+        // This will be the arm case
+        case 1: //amaze_mission_sequencer::request::START:
             if (this->currentFollowerState_ == IDLE && this->poseValid_ && this->stateValid_ && this->extendedStateValid_)
             {
                 std::vector<std::string> header_default = {"x", "y", "z", "yaw", "holdtime"};
@@ -172,6 +173,11 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
                 // Set initial pose
                 this->startingVehiclePose_ = this->currentVehiclePose_;
                 this->vehiclePoseSetpoint_ = this->startingVehiclePose_;
+        
+        // TODO: A bit of handeling above ^
+
+        // TODO: This is a different case - arm iff this->waypointList_ is not empty and mission ID set
+        // this->waypointList_ needs to be cleared in disarm
 
                 // Preparation for arming
                 this->armCmd_.request.value = true;
@@ -397,6 +403,9 @@ void AmazeMissionSequencer::logic(void)
                 {
                     ROS_INFO("Disarmed");
                     this->currentFollowerState_ = IDLE;
+                    // pop top entry of filenames_
+                    // Iff list not empty - move tor "prearm"
+                    // This "loops" through missions
                 }
             }
             break;
