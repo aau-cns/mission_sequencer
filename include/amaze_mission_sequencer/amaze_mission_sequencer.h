@@ -28,7 +28,7 @@
 
 #define DEG_TO_RAD  M_PI/180.0
 
-enum State {IDLE, ARM, MISSION, HOLD, LAND, DISARM};
+enum State {IDLE, PREARM, ARM, MISSION, HOLD, LAND, DISARM};
 static const char *StateStr[] = { "IDLE", "ARM", "MISSION", "HOLD", "LAND", "DISARM" };
 
 class AmazeMissionSequencer
@@ -89,7 +89,7 @@ private:
     void rosPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
     void rosRequestCallback(const amaze_mission_sequencer::request::ConstPtr& msg);
     
-    void publishResponse(int id, bool response, bool completed);
+    void publishResponse(int id, int request, bool response, bool completed);
 
     geometry_msgs::PoseStamped waypointToPoseStamped(const ParseWaypoint::Waypoint& waypoint);
 

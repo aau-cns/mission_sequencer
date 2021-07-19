@@ -28,9 +28,11 @@ AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle &nh) :
     this->requestNumber_ = 0;
     this->currentFollowerState_ = IDLE;
 
-    waypointList_ = std::vector<ParseWaypoint::Waypoint>(0);
+    this->waypointList_ = std::vector<ParseWaypoint::Waypoint>(0);
     this->reachedWaypoint_ = false;
     this->reachedWaypointTime_ = ros::Time::now();
+
+    this->filenames_ = std::vector<std::string>(0);
 
     this->offboardMode_.request.custom_mode = "OFFBOARD";
     this->armCmd_.request.value = true;
@@ -103,68 +105,106 @@ void AmazeMissionSequencer::rosPoseCallback(const geometry_msgs::PoseStamped::Co
 };
 
 
-bool AmazeMissionSequencer::getFilenames() {
+bool AmazeMissionSequencer::getFilenames()
+{
+    // Define filepaths
+    XmlRpc::XmlRpcValue filepaths;
 
-  // Define filepaths
-  XmlRpc::XmlRpcValue filepaths;
-
-  // get filepaths
-  if (!nh_.getParam("/autonomy/missions/mission_" + std::to_string(missionID_) + "/filepaths", filepaths)) {
-
-    // [TODO] Manage error
-    return false;
-  }
-
-  // Check type to be array
-  if (filepaths.getType() ==  XmlRpc::XmlRpcValue::TypeArray) {
-
-    // Loop through filepaths
-    for (int j = 0; j < filepaths.size(); ++j) {
-
-
-      // Check type to be string
-      if (filepaths[j].getType() ==  XmlRpc::XmlRpcValue::TypeString) {
-
-        // assign filename
-        filenames_.emplace_back(std::string(filepaths[j]));
-
-        return true;
-      }
+    // get filepaths
+    if (!nh_.getParam("/autonomy/missions/mission_" + std::to_string(missionID_) + "/filepaths", filepaths))
+    {
+        // [TODO] Manage error
+        return false;
     }
-  } else {
 
-    // [TODO] Manage error
-    return false;
-  }
-}
+    // Check type to be array
+    if (filepaths.getType() ==  XmlRpc::XmlRpcValue::TypeArray)
+    {
+        // Loop through filepaths
+        for (int j = 0; j < filepaths.size(); ++j)
+        {
+            // Check type to be string
+            if (filepaths[j].getType() ==  XmlRpc::XmlRpcValue::TypeString)
+            {
+                // assign filename
+                this->filenames_.emplace_back(std::string(filepaths[j]));
+
+                return true;
+            }
+        }
+    }
+    else
+    {
+        // [TODO] Manage error
+        return false;
+    }
+};
 
 void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::request::ConstPtr& msg)
 {
     bool wrongInput = false;
 
     // Get mission id
-    this->missionID_ = int(msg->id);
-
-    // TODO: This is read mission case later
-    // Get filepaths
-    if (!getFilenames()) {
-      // [TODO] Manage error
+    if (this->missionID_ != int(msg->id))
+    {
+        if (int(msg->request) == amaze_mission_sequencer::request::READ && (this->currentFollowerState_ == IDLE || this->currentFollowerState_ == PREARM))
+        {
+            this->currentFollowerState_ = IDLE;
+            this->missionID_ = int(msg->id);
+        }
+        else
+        {            
+            ROS_INFO_STREAM("WRONG REQUEST FOR CURRENT STATE: " << StateStr[this->currentFollowerState_]);
+            // Respond if input was wrong
+            this->publishResponse(this->missionID_, int(msg->request), false, false);
+            return;
+        }
     }
-    // [TODO] Temporary we use only the first filename of filenames
-    //        Here a logic to handle multiple filenames shuld be implemented
-    std::string filename = filenames_[0];
 
     switch (int(msg->request))
     {
-        // This will be the arm case
-        case 1: //amaze_mission_sequencer::request::START:
-            if (this->currentFollowerState_ == IDLE && this->poseValid_ && this->stateValid_ && this->extendedStateValid_)
+        case amaze_mission_sequencer::request::READ:
+            if (this->currentFollowerState_ == IDLE)
             {
+                try
+                {
+                    // Get filepaths
+                    if (!getFilenames())
+                    {
+                        // Respond that mission could not be loaded
+                        this->publishResponse(this->missionID_, int(msg->request), false, false);
+                        ROS_INFO_STREAM("CAN NOT READ MISSION(S)");
+                        return;
+                    }
+
+                    // Respond that mission has been loaded
+                    this->publishResponse(this->missionID_, int(msg->request), true, false);
+
+                    this->currentFollowerState_ = PREARM;
+                }
+                catch(const std::exception& e)
+                {
+                    // Respond that mission could not be loaded
+                    this->publishResponse(this->missionID_, int(msg->request), false, false);
+                    ROS_INFO_STREAM("CAN NOT READ MISSION(S) - Exception");
+                    std::cerr << e.what() << '\n';
+                }                
+            }
+            else
+            {
+                wrongInput = true;
+            }
+            break;
+        case amaze_mission_sequencer::request::ARM:
+            if (this->currentFollowerState_ == PREARM && this->poseValid_ && this->stateValid_ && this->extendedStateValid_)
+            {
+                // Take first entry of filename list
+                std::string filename = this->filenames_[0];
+
                 std::vector<std::string> header_default = {"x", "y", "z", "yaw", "holdtime"};
                 std::shared_ptr<ParseWaypoint> WaypointParser =  std::make_shared<ParseWaypoint>(filename, header_default);
 
                 // Parse waypoint file
-                // TODO: SOLVE WRONG ID OR 0-LENGTH WITH C++ EXCEPTION - respond with false
                 WaypointParser->readParseCsv();
 
                 // Get the data
@@ -173,11 +213,14 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
                 // Set initial pose
                 this->startingVehiclePose_ = this->currentVehiclePose_;
                 this->vehiclePoseSetpoint_ = this->startingVehiclePose_;
-        
-        // TODO: A bit of handeling above ^
 
-        // TODO: This is a different case - arm iff this->waypointList_ is not empty and mission ID set
-        // this->waypointList_ needs to be cleared in disarm
+                if (this->waypointList_.size() == 0)
+                {
+                    // Error if waypoint list is empty
+                    this->publishResponse(this->missionID_, int(msg->request), false, false);
+                    ROS_INFO_STREAM("MISSION FILE EMPTY");
+                    return;
+                }
 
                 // Preparation for arming
                 this->armCmd_.request.value = true;
@@ -186,14 +229,14 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
                 this->currentFollowerState_ = ARM;
 
                 // Respond that mission starts
-                this->publishResponse(this->missionID_, true, false);
+                this->publishResponse(this->missionID_, int(msg->request), true, false);
             }
             else
             {
                 wrongInput = true;
             }
             break;
-        case 2:
+        case amaze_mission_sequencer::request::HOLD:
             if (this->currentFollowerState_ == MISSION)
             {
                 ROS_INFO_STREAM("Holding Position: x = " << this->currentVehiclePose_.pose.position.x << ", y = " << this->currentVehiclePose_.pose.position.y << ", z = " << this->currentVehiclePose_.pose.position.z);
@@ -201,28 +244,28 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
                 this->currentFollowerState_ = HOLD;
 
                 // Respond that mission starts
-                this->publishResponse(this->missionID_, true, false);
+                this->publishResponse(this->missionID_, int(msg->request), true, false);
             }
             else
             {
                 wrongInput = true;
             }
             break;
-        case 3:
+        case amaze_mission_sequencer::request::RESUME:
             if (this->currentFollowerState_ == HOLD)
             {
                 ROS_INFO_STREAM("Resuming Mission");
                 this->currentFollowerState_ = MISSION;
 
                 // Respond that mission starts
-                this->publishResponse(this->missionID_, true, false);
+                this->publishResponse(this->missionID_, int(msg->request), true, false);
             }
             else
             {
                 wrongInput = true;
             }
             break;
-        case 4:
+        case amaze_mission_sequencer::request::ABORT:
             ROS_INFO("Abort Mission - Landing");
             if (this->rosServiceLand_.call(this->landCmd_))
             {
@@ -235,7 +278,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
             this->currentFollowerState_ = LAND;
 
                 // Respond that mission starts
-                this->publishResponse(this->missionID_, true, false);
+                this->publishResponse(this->missionID_, int(msg->request), true, false);
             break;        
         default:
             ROS_ERROR("REQUEST NOT DEFINED");
@@ -246,17 +289,19 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
     {
         ROS_INFO_STREAM("WRONG REQUEST FOR CURRENT STATE: " << StateStr[this->currentFollowerState_]);
         // Respond if input was wrong
-        this->publishResponse(this->missionID_, false, false);
+        this->publishResponse(this->missionID_, int(msg->request), false, false);
     }
 };
 
-void AmazeMissionSequencer::publishResponse(int id, bool response, bool completed)
+void AmazeMissionSequencer::publishResponse(int id, int request, bool response, bool completed)
 {
     amaze_mission_sequencer::response msg;
 
+    // TODO: add request topics part
     msg.header = std_msgs::Header();
     msg.header.stamp = ros::Time::now();
-    msg.id = uint8_t(id);
+    msg.request.id = uint8_t(id);
+    msg.request.request = uint8_t(request);
     msg.response = response;
     msg.completed = completed;
 
@@ -301,6 +346,9 @@ void AmazeMissionSequencer::logic(void)
     switch (this->currentFollowerState_)
     {
         case IDLE:
+            return;
+
+        case PREARM:
             return;
             
         case ARM:
@@ -380,8 +428,8 @@ void AmazeMissionSequencer::logic(void)
                         ROS_INFO("Landing");
                         this->currentFollowerState_ = LAND;
 
-			 // Respond that mission succefully finished
-			 this->publishResponse(this->missionID_, false, true);
+                        // Respond that mission succefully finished
+                        this->publishResponse(this->missionID_, amaze_mission_sequencer::request::UNDEF, false, true);
                     }
                 }
             }              
@@ -402,10 +450,17 @@ void AmazeMissionSequencer::logic(void)
                 if (this->armCmd_.response.success)
                 {
                     ROS_INFO("Disarmed");
-                    this->currentFollowerState_ = IDLE;
-                    // pop top entry of filenames_
-                    // Iff list not empty - move tor "prearm"
-                    // This "loops" through missions
+                    this->filenames_.erase(this->filenames_.begin());                    
+                    this->waypointList_.clear();
+                    if (this->filenames_.size() == 0)
+                    {
+                        this->currentFollowerState_ = IDLE;
+                    }
+                    else
+                    {
+                        this->currentFollowerState_ = PREARM;
+                    }
+                    
                 }
             }
             break;
