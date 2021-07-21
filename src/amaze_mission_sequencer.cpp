@@ -111,7 +111,7 @@ bool AmazeMissionSequencer::getFilenames()
     XmlRpc::XmlRpcValue filepaths;
 
     // get filepaths
-    if (!nh_.getParam("/autonomy/missions/mission_" + std::to_string(missionID_) + "/filepaths", filepaths))
+    if (!nh_.getParam("/autonomy/missions/mission_" + std::to_string(this->missionID_) + "/filepaths", filepaths))
     {
         // [TODO] Manage error
         return false;
