@@ -128,10 +128,10 @@ bool AmazeMissionSequencer::getFilenames()
             {
                 // assign filename
                 this->filenames_.emplace_back(std::string(filepaths[j]));
-
-                return true;
             }
         }
+
+        return true;
     }
     else
     {
