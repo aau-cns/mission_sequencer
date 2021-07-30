@@ -49,8 +49,17 @@ AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle &nh) :
 
     this->relWaypoints_ = true;
 
-    this->thresholdPosition_ = 0.3;
-    this->thresholdYaw_ = 0.1;
+    // Load Threshold Parameters
+    if (!nh_.getParam("/amaze_mission_sequencer/threshold_position", this->thresholdPosition_))
+    {
+      ROS_WARN("Could not retrieve threshold for position, setting to 0.3m");
+      this->thresholdPosition_ = 0.3;
+    }
+    if (!nh_.getParam("/amaze_mission_sequencer/threshold_yaw", this->thresholdYaw_))
+    {
+      ROS_WARN("Could not retrieve threshold for yaw, setting to 0.1 rad");
+      this->thresholdYaw_ = 0.1;
+    }
 
     // Subscriber
     this->rosSubscriberVehicleState_ = nh.subscribe("/mavros/state", 10, &AmazeMissionSequencer::rosVehicleStateCallback, this);
