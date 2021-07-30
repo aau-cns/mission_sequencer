@@ -51,7 +51,7 @@ AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle &nh) :
 
     this->thresholdPosition_ = 0.3;
     this->thresholdYaw_ = 0.1;
-    
+
     // Subscriber
     this->rosSubscriberVehicleState_ = nh.subscribe("/mavros/state", 10, &AmazeMissionSequencer::rosVehicleStateCallback, this);
     this->rosSubscriberExtendedVehicleState_ = nh.subscribe("/mavros/extended_state", 10, &AmazeMissionSequencer::rosExtendedVehicleStateCallback, this);
@@ -73,12 +73,12 @@ AmazeMissionSequencer::~AmazeMissionSequencer()
 };
 
 void AmazeMissionSequencer::rosVehicleStateCallback(const mavros_msgs::State::ConstPtr& msg)
-{    
+{
     if (!this->stateValid_)
     {
         this->stateValid_ = true;
     }
-    
+
     this->currentVehicleState_ = *msg;
 };
 
@@ -88,7 +88,7 @@ void AmazeMissionSequencer::rosExtendedVehicleStateCallback(const mavros_msgs::E
     {
         this->extendedStateValid_ = true;
     }
-    
+
     this->currentExtendedVehicleState_ = *msg;
 };
 
@@ -99,7 +99,7 @@ void AmazeMissionSequencer::rosPoseCallback(const geometry_msgs::PoseStamped::Co
         this->startingVehiclePose_ = *msg;
         this->vehiclePoseSetpoint_ = this->startingVehiclePose_;
         this->poseValid_ = true;
-    }    
+    }
 
     this->currentVehiclePose_ = *msg;
 };
@@ -153,7 +153,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
             this->missionID_ = int(msg->id);
         }
         else
-        {            
+        {
             ROS_INFO_STREAM("WRONG REQUEST FOR CURRENT STATE: " << StateStr[this->currentFollowerState_]);
             // Respond if input was wrong
             this->publishResponse(this->missionID_, int(msg->request), false, false);
@@ -188,7 +188,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
                     this->publishResponse(this->missionID_, int(msg->request), false, false);
                     ROS_INFO_STREAM("CAN NOT READ MISSION(S) - Exception");
                     std::cerr << e.what() << '\n';
-                }                
+                }
             }
             else
             {
@@ -279,7 +279,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
 
                 // Respond that mission starts
                 this->publishResponse(this->missionID_, int(msg->request), true, false);
-            break;        
+            break;
         default:
             ROS_ERROR("REQUEST NOT DEFINED");
             break;
@@ -311,11 +311,11 @@ void AmazeMissionSequencer::publishResponse(int id, int request, bool response, 
 geometry_msgs::PoseStamped AmazeMissionSequencer::waypointToPoseStamped(const ParseWaypoint::Waypoint& waypoint)
 {
     geometry_msgs::PoseStamped pose;
-    
+
     pose.pose.position.x = waypoint.x;
     pose.pose.position.y = waypoint.y;
     pose.pose.position.z = waypoint.z;
-    
+
     tf2::Quaternion waypointQuaternion;
     waypointQuaternion.setRotation(tf2::Vector3(0, 0, 1), waypoint.yaw*DEG_TO_RAD);
     waypointQuaternion.normalize();
@@ -324,14 +324,14 @@ geometry_msgs::PoseStamped AmazeMissionSequencer::waypointToPoseStamped(const Pa
         tf2::Quaternion startingQuaternion(this->startingVehiclePose_.pose.orientation.x, this->startingVehiclePose_.pose.orientation.y,this->startingVehiclePose_.pose.orientation.z, this->startingVehiclePose_.pose.orientation.w);
 
         waypointQuaternion = startingQuaternion * waypointQuaternion;
-        
+
         double startingYaw, startingPitch, startingRoll;
         tf2::Matrix3x3(startingQuaternion).getEulerYPR(startingYaw, startingPitch, startingRoll);
-        
+
         pose.pose.position.x = (waypoint.x*cos(startingYaw) - waypoint.y*sin(startingYaw)) + this->startingVehiclePose_.pose.position.x;
         pose.pose.position.y = (waypoint.x*sin(startingYaw) + waypoint.y*cos(startingYaw)) + this->startingVehiclePose_.pose.position.y;
         pose.pose.position.z = waypoint.z + this->startingVehiclePose_.pose.position.z;
-    }    
+    }
 
     pose.pose.orientation.x = waypointQuaternion[0];
     pose.pose.orientation.y = waypointQuaternion[1];
@@ -350,7 +350,7 @@ void AmazeMissionSequencer::logic(void)
 
         case PREARM:
             return;
-            
+
         case ARM:
             if (!this->currentVehicleState_.armed)
             {
@@ -381,12 +381,12 @@ void AmazeMissionSequencer::logic(void)
                 // Publish response of start
                 this->currentFollowerState_ = MISSION;
                 this->reachedWaypoint_ = false;
-            }            
+            }
             break;
-        
+
         case MISSION:
             if (this->waypointList_.size() != 0)
-            {                
+            {
                 double differencePosition;
                 double differenceYaw;
                 geometry_msgs::PoseStamped currentWaypoint = this->waypointToPoseStamped(this->waypointList_[0]);
@@ -402,14 +402,18 @@ void AmazeMissionSequencer::logic(void)
                 if (differenceYaw > M_PI)
                 {
                     differenceYaw -= 2.0*M_PI;
-                }                
+                }
+                else if (differenceYaw < M_PI)
+                {
+                    differenceYaw += 2.0*M_PI;
+                }
                 // std::cout << "Yaw: " << differenceYaw << std::endl;
                 if (!this->reachedWaypoint_ && differencePosition<this->thresholdPosition_ && abs(differenceYaw)<this->thresholdYaw_)
                 {
                     ROS_INFO_STREAM("Reached Waypoint: x = " << this->waypointList_[0].x << ", y = " << this->waypointList_[0].y << ", z = " << this->waypointList_[0].z << ", yaw = " << this->waypointList_[0].yaw);
                     this->reachedWaypoint_ = true;
                     this->reachedWaypointTime_ = ros::Time::now();
-                } 
+                }
 
                 if (this->reachedWaypoint_ && (ros::Time::now() - this->reachedWaypointTime_)>ros::Duration(this->waypointList_[0].holdtime) )
                 {
@@ -417,7 +421,7 @@ void AmazeMissionSequencer::logic(void)
                     this->waypointList_.erase(this->waypointList_.begin());
                     this->vehiclePoseSetpoint_ = this->waypointToPoseStamped(this->waypointList_[0]);
                     this->reachedWaypoint_ = false;
-                }        
+                }
             }
             else
             {
@@ -432,9 +436,9 @@ void AmazeMissionSequencer::logic(void)
                         this->publishResponse(this->missionID_, amaze_mission_sequencer::request::UNDEF, false, true);
                     }
                 }
-            }              
+            }
             break;
-        
+
         case LAND:
             if (this->currentExtendedVehicleState_.landed_state == this->currentExtendedVehicleState_.LANDED_STATE_ON_GROUND)
             {
@@ -443,14 +447,14 @@ void AmazeMissionSequencer::logic(void)
                 this->currentFollowerState_ = DISARM;
             }
             break;
-        
+
         case DISARM:
             if (this->rosServiceArm_.call(this->armCmd_))
             {
                 if (this->armCmd_.response.success)
                 {
                     ROS_INFO("Disarmed");
-                    this->filenames_.erase(this->filenames_.begin());                    
+                    this->filenames_.erase(this->filenames_.begin());
                     this->waypointList_.clear();
                     if (this->filenames_.size() == 0)
                     {
@@ -460,7 +464,7 @@ void AmazeMissionSequencer::logic(void)
                     {
                         this->currentFollowerState_ = PREARM;
                     }
-                    
+
                 }
             }
             break;
@@ -480,6 +484,6 @@ void AmazeMissionSequencer::publishPoseSetpoint(void)
         this->vehiclePoseSetpoint_.header = std_msgs::Header();
         this->vehiclePoseSetpoint_.header.stamp = ros::Time::now();
         this->rosPublisherPoseSetpoint_.publish(vehiclePoseSetpoint_);
-    }    
+    }
 
 };
