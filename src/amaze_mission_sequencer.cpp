@@ -288,7 +288,12 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
 
                 // Respond that mission starts
                 this->publishResponse(this->missionID_, int(msg->request), true, false);
-            break;
+            break; 
+    case amaze_mission_sequencer::request::DISARM:
+        this->currentFollowerState_ = DISARM;
+        // Respond that mission starts
+        this->publishResponse(this->missionID_, int(msg->request), true, false);
+        break;
         default:
             ROS_ERROR("REQUEST NOT DEFINED");
             break;
@@ -407,15 +412,12 @@ void AmazeMissionSequencer::logic(void)
                 differencePosition = sqrt(differenceSquared);
                 // std::cout << "Pos: " << differencePosition << std::endl;
 
-                differenceYaw = 2.0*double(tf2::Quaternion(this->currentVehiclePose_.pose.orientation.x, this->currentVehiclePose_.pose.orientation.y,this->currentVehiclePose_.pose.orientation.z, this->currentVehiclePose_.pose.orientation.w).angle(tf2::Quaternion(currentWaypoint.pose.orientation.x, currentWaypoint.pose.orientation.y, currentWaypoint.pose.orientation.z, currentWaypoint.pose.orientation.w)));
-                if (differenceYaw > M_PI)
+                differenceYaw = std::abs(2.0*double(tf2::Quaternion(this->currentVehiclePose_.pose.orientation.x, this->currentVehiclePose_.pose.orientation.y,this->currentVehiclePose_.pose.orientation.z, this->currentVehiclePose_.pose.orientation.w).angle(tf2::Quaternion(currentWaypoint.pose.orientation.x, currentWaypoint.pose.orientation.y, currentWaypoint.pose.orientation.z, currentWaypoint.pose.orientation.w))));
+                if (differenceYaw > 2*M_PI)
                 {
-                    differenceYaw -= 2.0*M_PI;
+                    differenceYaw -= 2*M_PI;
                 }
-                else if (differenceYaw < M_PI)
-                {
-                    differenceYaw += 2.0*M_PI;
-                }
+
                 // std::cout << "Yaw: " << differenceYaw << std::endl;
                 if (!this->reachedWaypoint_ && differencePosition<this->thresholdPosition_ && abs(differenceYaw)<this->thresholdYaw_)
                 {
@@ -452,12 +454,13 @@ void AmazeMissionSequencer::logic(void)
             if (this->currentExtendedVehicleState_.landed_state == this->currentExtendedVehicleState_.LANDED_STATE_ON_GROUND)
             {
                 ROS_INFO("Landed");
-                this->armCmd_.request.value = false;
-                this->currentFollowerState_ = DISARM;
+                //this->armCmd_.request.value = false;
+                //this->currentFollowerState_ = DISARM;
             }
             break;
 
         case DISARM:
+            this->armCmd_.request.value = false;
             if (this->rosServiceArm_.call(this->armCmd_))
             {
                 if (this->armCmd_.response.success)
