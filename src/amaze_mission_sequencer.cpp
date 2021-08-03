@@ -299,20 +299,21 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
 			
     case amaze_mission_sequencer::request::DISARM:
 
-		// Preparation for arming
-    this->disarmCmd_.request.broadcast = false;
-    this->disarmCmd_.request.command = 400;
-    this->disarmCmd_.request.confirmation = 0;
-    this->disarmCmd_.request.param1 = 0.0;
-    this->disarmCmd_.request.param2 = 21196.0;
-    this->disarmCmd_.request.param3 = 0.0;
-    this->disarmCmd_.request.param4 = 0.0;
-    this->disarmCmd_.request.param5 = 0.0;
-    this->disarmCmd_.request.param6 = 0.0;
-    this->disarmCmd_.request.param7 = 0.0;
-		this->disarmRequestTime_ = ros::Time::now();
+        // Preparation for arming
+        this->disarmCmd_.request.broadcast = false;
+        this->disarmCmd_.request.command = 400;
+        this->disarmCmd_.request.confirmation = 0;
+        this->disarmCmd_.request.param1 = 0.0;
+        this->disarmCmd_.request.param2 = 21196.0;
+        this->disarmCmd_.request.param3 = 0.0;
+        this->disarmCmd_.request.param4 = 0.0;
+        this->disarmCmd_.request.param5 = 0.0;
+        this->disarmCmd_.request.param6 = 0.0;
+        this->disarmCmd_.request.param7 = 0.0;
+        this->disarmRequestTime_ = ros::Time::now();
 
-		// Set state
+        // Set state
+        ROS_INFO("Disarming");
         this->currentFollowerState_ = DISARM;
    
         // Respond to request
@@ -420,6 +421,7 @@ void AmazeMissionSequencer::logic(void)
                 // Publish response of start
                 this->currentFollowerState_ = MISSION;
                 this->reachedWaypoint_ = false;
+                this->landed_ = true;
             }
             break;
 
@@ -478,13 +480,13 @@ void AmazeMissionSequencer::logic(void)
         case LAND:
             if (this->currentExtendedVehicleState_.landed_state == this->currentExtendedVehicleState_.LANDED_STATE_ON_GROUND)
             {
-				this->landed_ = true;
+                this->landed_ = true;
                 ROS_INFO("Landed");
             }
             break;
 
         case DISARM:
-      if (this->currentVehicleState_.armed && (ros::Time::now().toSec() - this->disarmRequestTime_.toSec() > 2.5))
+      if (this->currentVehicleState_.armed)
             {
 				if (this->rosServiceDisrm_.call(this->disarmCmd_))
 				{
