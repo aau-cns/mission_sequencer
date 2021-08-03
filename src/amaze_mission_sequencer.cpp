@@ -49,6 +49,8 @@ AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle &nh) :
 
     this->relWaypoints_ = true;
 
+	this->landed_ = false;
+
     // Load Threshold Parameters
     if (!nh_.getParam("/amaze_mission_sequencer/threshold_position", this->thresholdPosition_))
     {
@@ -61,17 +63,19 @@ AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle &nh) :
       this->thresholdYaw_ = 0.1;
     }
 
-    // Subscriber
+    // Subscribers
     this->rosSubscriberVehicleState_ = nh.subscribe("/mavros/state", 10, &AmazeMissionSequencer::rosVehicleStateCallback, this);
     this->rosSubscriberExtendedVehicleState_ = nh.subscribe("/mavros/extended_state", 10, &AmazeMissionSequencer::rosExtendedVehicleStateCallback, this);
     this->rosSubscriberVehiclePose_ = nh.subscribe("/mavros/local_position/pose", 10, &AmazeMissionSequencer::rosPoseCallback, this);
     this->rosSubscriberRequest_ = nh.subscribe("/autonomy/request", 10, &AmazeMissionSequencer::rosRequestCallback, this);
 
-    // Publisher
+    // Publishers
     this->rosPublisherPoseSetpoint_ = nh.advertise<geometry_msgs::PoseStamped>("/mavros/setpoint_position/local", 10);
     this->rosPublisherResponse_ = nh.advertise<amaze_mission_sequencer::response>("/autonomy/response", 10);
 
+	// Services
     this->rosServiceArm_ = nh.serviceClient<mavros_msgs::CommandBool>("/mavros/cmd/arming");
+	this->rosServiceDisrm_ = nh.serviceClient<mavros_msgs::CommandLong>("/mavros/cmd/command");
     this->rosServiceLand_ = nh.serviceClient<mavros_msgs::CommandTOL>("/mavros/cmd/land");
     this->rosServiceSetMode_ = nh.serviceClient<mavros_msgs::SetMode>("/mavros/set_mode");
 };
@@ -204,6 +208,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
                 wrongInput = true;
             }
             break;
+
         case amaze_mission_sequencer::request::ARM:
             if (this->currentFollowerState_ == PREARM && this->poseValid_ && this->stateValid_ && this->extendedStateValid_)
             {
@@ -237,7 +242,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
                 this->offboardRequestTime_ = ros::Time::now();
                 this->currentFollowerState_ = ARM;
 
-                // Respond that mission starts
+                // Respond to request
                 this->publishResponse(this->missionID_, int(msg->request), true, false);
             }
             else
@@ -245,6 +250,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
                 wrongInput = true;
             }
             break;
+
         case amaze_mission_sequencer::request::HOLD:
             if (this->currentFollowerState_ == MISSION)
             {
@@ -252,7 +258,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
                 this->vehiclePoseSetpoint_ = this->currentVehiclePose_;
                 this->currentFollowerState_ = HOLD;
 
-                // Respond that mission starts
+                // Respond to request
                 this->publishResponse(this->missionID_, int(msg->request), true, false);
             }
             else
@@ -266,7 +272,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
                 ROS_INFO_STREAM("Resuming Mission");
                 this->currentFollowerState_ = MISSION;
 
-                // Respond that mission starts
+                // Respond to request
                 this->publishResponse(this->missionID_, int(msg->request), true, false);
             }
             else
@@ -274,6 +280,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
                 wrongInput = true;
             }
             break;
+
         case amaze_mission_sequencer::request::ABORT:
             ROS_INFO("Abort Mission - Landing");
             if (this->rosServiceLand_.call(this->landCmd_))
@@ -286,14 +293,32 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
             }
             this->currentFollowerState_ = LAND;
 
-                // Respond that mission starts
+                // Respond to request
                 this->publishResponse(this->missionID_, int(msg->request), true, false);
-            break; 
+            break;
+			
     case amaze_mission_sequencer::request::DISARM:
+
+		// Preparation for arming
+    this->disarmCmd_.request.broadcast = false;
+    this->disarmCmd_.request.command = 400;
+    this->disarmCmd_.request.confirmation = 0;
+    this->disarmCmd_.request.param1 = 0.0;
+    this->disarmCmd_.request.param2 = 21196.0;
+    this->disarmCmd_.request.param3 = 0.0;
+    this->disarmCmd_.request.param4 = 0.0;
+    this->disarmCmd_.request.param5 = 0.0;
+    this->disarmCmd_.request.param6 = 0.0;
+    this->disarmCmd_.request.param7 = 0.0;
+		this->disarmRequestTime_ = ros::Time::now();
+
+		// Set state
         this->currentFollowerState_ = DISARM;
-        // Respond that mission starts
+   
+        // Respond to request
         this->publishResponse(this->missionID_, int(msg->request), true, false);
         break;
+
         default:
             ROS_ERROR("REQUEST NOT DEFINED");
             break;
@@ -368,7 +393,7 @@ void AmazeMissionSequencer::logic(void)
         case ARM:
             if (!this->currentVehicleState_.armed)
             {
-                if (this->currentVehicleState_.mode != "OFFBOARD" && (ros::Time::now() - this->offboardRequestTime_ > ros::Duration(2.5)))
+                if (this->currentVehicleState_.mode != "OFFBOARD" && (ros::Time::now().toSec() - this->offboardRequestTime_.toSec() > 2.5))
                 {
                     if (this->rosServiceSetMode_.call(this->offboardMode_) && this->offboardMode_.response.mode_sent)
                     {
@@ -378,7 +403,7 @@ void AmazeMissionSequencer::logic(void)
                 }
                 else
                 {
-                    if (!this->currentVehicleState_.armed && (ros::Time::now() - this->armRequestTime_ > ros::Duration(2.5)))
+                    if (!this->currentVehicleState_.armed && (ros::Time::now().toSec() - this->armRequestTime_.toSec() > 2.5))
                     {
                         if (this->rosServiceArm_.call(this->armCmd_) && this->armCmd_.response.success)
                         {
@@ -426,7 +451,7 @@ void AmazeMissionSequencer::logic(void)
                     this->reachedWaypointTime_ = ros::Time::now();
                 }
 
-                if (this->reachedWaypoint_ && (ros::Time::now() - this->reachedWaypointTime_)>ros::Duration(this->waypointList_[0].holdtime) )
+                if (this->reachedWaypoint_ && (ros::Time::now().toSec() - this->reachedWaypointTime_.toSec()) > this->waypointList_[0].holdtime)
                 {
                     ROS_INFO_STREAM("Waited for: " << this->waypointList_[0].holdtime << " Seconds");
                     this->waypointList_.erase(this->waypointList_.begin());
@@ -453,39 +478,53 @@ void AmazeMissionSequencer::logic(void)
         case LAND:
             if (this->currentExtendedVehicleState_.landed_state == this->currentExtendedVehicleState_.LANDED_STATE_ON_GROUND)
             {
+				this->landed_ = true;
                 ROS_INFO("Landed");
-                //this->armCmd_.request.value = false;
-                //this->currentFollowerState_ = DISARM;
             }
             break;
 
         case DISARM:
-            this->armCmd_.request.value = false;
-            if (this->rosServiceArm_.call(this->armCmd_))
+      if (this->currentVehicleState_.armed && (ros::Time::now().toSec() - this->disarmRequestTime_.toSec() > 2.5))
             {
-                if (this->armCmd_.response.success)
-                {
-                    ROS_INFO("Disarmed");
-                    this->filenames_.erase(this->filenames_.begin());
-                    this->waypointList_.clear();
-                    if (this->filenames_.size() == 0)
-                    {
-                        this->currentFollowerState_ = IDLE;
-                    }
-                    else
-                    {
-                        this->currentFollowerState_ = PREARM;
-                    }
+				if (this->rosServiceDisrm_.call(this->disarmCmd_))
+				{
+					if (this->disarmCmd_.response.success)
+					{
+						ROS_INFO("Disarmed");
+						this->filenames_.erase(this->filenames_.begin());
+						this->waypointList_.clear();
+						if (this->filenames_.size() == 0)
+						{
+							this->currentFollowerState_ = IDLE;
+						}
+						else
+						{
+							this->currentFollowerState_ = PREARM;
+						}
+					}
+				}
 
-                }
-            }
+				// If you still want to let the PX$ check for vehicle on the ground than
+				// de-comment the following code and move the above snippent into
+				// the else condition below
+				
+				//if(!this.landed_)
+				//{
+				//	if (this->currentExtendedVehicleState_.landed_state == this->currentExtendedVehicleState_.LANDED_STATE_ON_GROUND)
+				//	{
+				//		this->landed_ = true;
+				//		ROS_INFO("Landed");
+				//	}
+				//} else {
+				//
+				//}
+			}
+
             break;
 
         case HOLD:
             break;
 
-        default:
-            break;
     }
 };
 

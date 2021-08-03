@@ -19,13 +19,14 @@
 
 // Include Services
 #include <mavros_msgs/CommandBool.h>
+#include <mavros_msgs/CommandLong.h>
 #include <mavros_msgs/CommandTOL.h>
 #include <mavros_msgs/SetMode.h>
 
 // Waypoint list
 #include "parse_waypoints.hpp"
 
-
+#define RAD_TO_DEG  180.0*M_PI
 #define DEG_TO_RAD  M_PI/180.0
 
 enum State {IDLE, PREARM, ARM, MISSION, HOLD, LAND, DISARM};
@@ -56,8 +57,10 @@ private:
 
     mavros_msgs::SetMode offboardMode_;
     mavros_msgs::CommandBool armCmd_;
+    mavros_msgs::CommandLong disarmCmd_;
     mavros_msgs::CommandTOL landCmd_;
     ros::Time armRequestTime_;
+    ros::Time disarmRequestTime_;
     ros::Time offboardRequestTime_;
 
     bool stateValid_;
@@ -69,6 +72,8 @@ private:
     double thresholdPosition_;
     double thresholdYaw_;
 
+	bool landed_;
+
     ros::Subscriber rosSubscriberVehicleState_;
     ros::Subscriber rosSubscriberExtendedVehicleState_;
     ros::Subscriber rosSubscriberVehiclePose_;
@@ -78,6 +83,7 @@ private:
     ros::Publisher rosPublisherResponse_;
 
     ros::ServiceClient rosServiceArm_;
+    ros::ServiceClient rosServiceDisrm_;
     ros::ServiceClient rosServiceLand_;
     ros::ServiceClient rosServiceSetMode_;
 
