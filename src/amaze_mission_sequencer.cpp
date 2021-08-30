@@ -13,8 +13,8 @@
 #include "amaze_mission_sequencer.h"
 
 
-AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle &nh) :
-  nh_(nh)
+AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle &nh, ros::NodeHandle &pnh) :
+  nh_(nh), pnh_(pnh)
 {
     this->currentVehicleState_ = mavros_msgs::State();
     this->currentExtendedVehicleState_ = mavros_msgs::ExtendedState();
@@ -51,48 +51,48 @@ AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle &nh) :
 
 	this->landed_ = false;
 
-    // Load Threshold Parameters
-    if (!nh_.getParam("threshold_position", this->thresholdPosition_))
+    //ros::NodeHandle private_nh("~");
+    // Load Parameters (privately)
+    if (!pnh_.getParam("threshold_position", this->thresholdPosition_))
     {
       ROS_WARN("Could not retrieve threshold for position, setting to 0.3m");
       this->thresholdPosition_ = 0.3;
     }
-    if (!nh_.getParam("threshold_yaw", this->thresholdYaw_))
+    if (!pnh_.getParam("threshold_yaw", this->thresholdYaw_))
     {
       ROS_WARN("Could not retrieve threshold for yaw, setting to 0.1 rad");
       this->thresholdYaw_ = 0.1;
     }
     std::string waypoint_fn;
-    nh.param<std::string>("waypoint_filename", waypoint_fn, "");
-    nh.param<bool>("automatic_landing", this->automatically_land_, false);
-    nh.param<bool>("verbose", this->verbose_, false);
+    pnh_.param<std::string>("waypoint_filename", waypoint_fn, "");
+    pnh_.param<bool>("automatic_landing", this->automatically_land_, false);
+    pnh_.param<bool>("verbose", this->verbose_, false);
 
 
-    // Subscribers
-    this->rosSubscriberVehicleState_ = nh.subscribe("/mavros_state_i", 10, &AmazeMissionSequencer::rosVehicleStateCallback, this);
-    this->rosSubscriberExtendedVehicleState_ = nh.subscribe("/mavros_extended_state_i", 10, &AmazeMissionSequencer::rosExtendedVehicleStateCallback, this);
-    this->rosSubscriberVehiclePose_ = nh.subscribe("/mavros_local_position_pose_i", 10, &AmazeMissionSequencer::rosPoseCallback, this);
-    this->rosSubscriberRequest_ = nh.subscribe("/autonomy_request_i", 10, &AmazeMissionSequencer::rosRequestCallback, this);
+    // Subscribers (relative to node's namespace)
+    this->rosSubscriberVehicleState_ = nh_.subscribe("mavros/state", 10, &AmazeMissionSequencer::rosVehicleStateCallback, this);
+    this->rosSubscriberExtendedVehicleState_ = nh_.subscribe("mavros/extended_state", 10, &AmazeMissionSequencer::rosExtendedVehicleStateCallback, this);
+    this->rosSubscriberVehiclePose_ = nh_.subscribe("mavros/local_position/pose", 10, &AmazeMissionSequencer::rosPoseCallback, this);
+    this->rosSubscriberRequest_ = nh_.subscribe("autonomy/request", 10, &AmazeMissionSequencer::rosRequestCallback, this);
 
-    // Publishers
-    this->rosPublisherPoseSetpoint_ = nh.advertise<geometry_msgs::PoseStamped>("/mavros_setpoint_position_local_o", 10);
-    this->rosPublisherResponse_ = nh.advertise<amaze_mission_sequencer::response>("/autonomy_response_o", 10);
+    // Publishers (relative to node's namespace)
+    this->rosPublisherPoseSetpoint_ = nh_.advertise<geometry_msgs::PoseStamped>("mavros/setpoint_position/local", 10);
+    this->rosPublisherResponse_ = nh_.advertise<amaze_mission_sequencer::response>("autonomy/response", 10);
 
-	// Services
-
+	// Services (relative to node's namespace)
     std::string service_mavros_cmd_arming;
-    nh.param<std::string>("mavros_cmd_arming_o", service_mavros_cmd_arming, "/mavros/cmd/arming");
+    pnh_.param<std::string>("mavros_cmd_arming_o", service_mavros_cmd_arming, "mavros/cmd/arming");
     std::string service_mavros_cmd_command;
-    nh.param<std::string>("mavros_cmd_command_o", service_mavros_cmd_command, "/mavros/cmd/command");
+    pnh_.param<std::string>("mavros_cmd_command_o", service_mavros_cmd_command, "mavros/cmd/command");
     std::string service_mavros_cmd_land;
-    nh.param<std::string>("mavros_cmd_land_o", service_mavros_cmd_land, "/mavros/cmd/land");
+    pnh_.param<std::string>("mavros_cmd_land_o", service_mavros_cmd_land, "mavros/cmd/land");
     std::string service_mavros_set_mode;
-    nh.param<std::string>("mavros_set_mode_o", service_mavros_set_mode, "/mavros/set_mode");   
+    pnh_.param<std::string>("mavros_set_mode_o", service_mavros_set_mode, "mavros/set_mode");   
 
-    this->rosServiceArm_ = nh.serviceClient<mavros_msgs::CommandBool>(service_mavros_cmd_arming);
-	this->rosServiceDisrm_ = nh.serviceClient<mavros_msgs::CommandLong>(service_mavros_cmd_command);
-    this->rosServiceLand_ = nh.serviceClient<mavros_msgs::CommandTOL>(service_mavros_cmd_land);
-    this->rosServiceSetMode_ = nh.serviceClient<mavros_msgs::SetMode>(service_mavros_set_mode);
+    this->rosServiceArm_ = nh_.serviceClient<mavros_msgs::CommandBool>(service_mavros_cmd_arming);
+	this->rosServiceDisrm_ = nh_.serviceClient<mavros_msgs::CommandLong>(service_mavros_cmd_command);
+    this->rosServiceLand_ = nh_.serviceClient<mavros_msgs::CommandTOL>(service_mavros_cmd_land);
+    this->rosServiceSetMode_ = nh_.serviceClient<mavros_msgs::SetMode>(service_mavros_set_mode);
 
 
     if (!waypoint_fn.empty())
@@ -158,7 +158,7 @@ bool AmazeMissionSequencer::getFilenames()
     XmlRpc::XmlRpcValue filepaths;
 
     // get filepaths
-    if (!nh_.getParam("/autonomy/missions/mission_" + std::to_string(this->missionID_) + "/filepaths", filepaths))
+    if (!nh_.getParam("autonomy/missions/mission_" + std::to_string(this->missionID_) + "/filepaths", filepaths))
     {
         // [TODO] Manage error
         return false;

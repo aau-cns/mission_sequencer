@@ -7,10 +7,10 @@ int main(int argc, char **argv)
     ROS_INFO("%s started", name.c_str());
     ros::init(argc, argv, name.c_str());
 
-    ros::NodeHandle nh("~");
+    ros::NodeHandle nh;
+    ros::NodeHandle private_nh("~");
 
-
-    AmazeMissionSequencer follower(nh);
+    AmazeMissionSequencer follower(nh, private_nh);
 
     ros::Rate rate(20.0);    
 

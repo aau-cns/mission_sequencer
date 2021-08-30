@@ -38,6 +38,7 @@ private:
 
     /// Nodehandler
     ros::NodeHandle nh_;
+    ros::NodeHandle pnh_;
 
     mavros_msgs::State currentVehicleState_;
     mavros_msgs::ExtendedState currentExtendedVehicleState_;
@@ -105,7 +106,7 @@ private:
     bool getFilenames();
 
 public:
-    AmazeMissionSequencer(ros::NodeHandle &nh);
+    AmazeMissionSequencer(ros::NodeHandle &nh, ros::NodeHandle &pnh);
     ~AmazeMissionSequencer();
 
     void logic(void);

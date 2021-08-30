@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <launch>
-  <arg name="node_name"      default="amaze_mission_sequencer"/>
+  <arg name="node_name"               default="amaze_mission_sequencer"/>
 
-  <arg name="threshold_position"    default="0.3" />
-  <arg name="threshold_yaw"         default="0.1" />
+  <arg name="threshold_position"      default="0.3" />
+  <arg name="threshold_yaw"           default="0.1" />
 
-  <arg name="waypoint_fn" default="" />
-  <arg name="auto_land" default="False" />
-  <arg name="verbose_output" default="False" />
+  <arg name="waypoint_fn"             default="" />
+  <arg name="auto_land"               default="False" />
+  <arg name="verbose_output"          default="False" />
 
   <!-- default topic names for remapping (_i: input, _o: output)  type: sensor_msgs::Image -->
   <arg name="mavros_state_i"                    default="/mavros/state" />
@@ -32,20 +32,20 @@
     <param name="threshold_yaw"       value="$(arg threshold_yaw)" />
     <param name="waypoint_filename"   value="$(arg waypoint_fn)" />
     <param name="automatic_landing"   value="$(arg auto_land)" />
-    <param name="verbose"   value="$(arg verbose_output)" />
+    <param name="verbose"             value="$(arg verbose_output)" />
+
+    <!--
+    <remap from="mavros/state"                     to="$(arg mavros_state_i)" />
+    <remap from="mavros/extended_state"            to="$(arg mavros_extended_state_i)" />
+    <remap from="mavros/local_position/pose"       to="$(arg mavros_local_position_pose_i)" />
+    <remap from="autonomy/request"                 to="$(arg autonomy_request_i)" />
+    <remap from="mavros/setpoint_position/local"   to="$(arg mavros_setpoint_position_local_o)" />
+    <remap from="autonomy/response"                to="$(arg autonomy_response_o)" /> -->
 
 
-    <remap from="/mavros_state_i"                     to="$(arg mavros_state_i)" />
-    <remap from="/mavros_extended_state_i"            to="$(arg mavros_extended_state_i)" />
-    <remap from="/mavros_local_position_pose_i"       to="$(arg mavros_local_position_pose_i)" />
-    <remap from="/autonomy_request_i"                 to="$(arg autonomy_request_i)" />
-    <remap from="/mavros_setpoint_position_local_o"   to="$(arg mavros_setpoint_position_local_o)" />
-    <remap from="/autonomy_response_o"                to="$(arg autonomy_response_o)" />
-
-    <param name="/mavros_cmd_arming_o"    value="$(arg mavros_cmd_arming_o)" />
-    <param name="/mavros_cmd_command_o"   value="$(arg mavros_cmd_command_o)" />   
-    <param name="/mavros_cmd_land_o"      value="$(arg mavros_cmd_land_o)" />
-    <param name="/mavros_set_mode_o"      value="$(arg mavros_set_mode_o)" />
-    <!-- <remap from="/fuse_node/motor_speeds" to="/hummingbird/motor_speed"/> -->
+    <!--<param name="mavros_cmd_arming_o"    value="$(arg mavros_cmd_arming_o)" />
+    <param name="mavros_cmd_command_o"   value="$(arg mavros_cmd_command_o)" />   
+    <param name="mavros_cmd_land_o"      value="$(arg mavros_cmd_land_o)" />
+    <param name="mavros_set_mode_o"      value="$(arg mavros_set_mode_o)" /> -->
   </node>
 </launch>
