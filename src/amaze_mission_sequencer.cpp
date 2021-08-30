@@ -160,11 +160,20 @@ void AmazeMissionSequencer::rosPoseCallback(const geometry_msgs::PoseStamped::Co
 
 
         // Initial YAW as it is used for LANDING
-        tf2::Quaternion startingQuaternion(this->startingVehiclePose_.pose.orientation.x, this->startingVehiclePose_.pose.orientation.y,this->startingVehiclePose_.pose.orientation.z, this->startingVehiclePose_.pose.orientation.w);
+        // The vehilce pose is in ENU:
+        tf2::Quaternion q_ENU_BODY(this->startingVehiclePose_.pose.orientation.x, this->startingVehiclePose_.pose.orientation.y,this->startingVehiclePose_.pose.orientation.z, this->startingVehiclePose_.pose.orientation.w);
+        
+        tf2::Quaternion q_NED_2_ENU(0,0,0.7071068,0.7071068); // [x,y,z,w]
+        //q_NED_2_ENU.setRotation(tf2::Vector3(0.7071068, 0, 0.7071068), M_PI);    
+        //q_NED_2_ENU.normalize();
+        tf2::Quaternion q_y;
+        q_y.setRotation(tf2::Vector3(0, 1, 0), M_PI); 
+
+        tf2::Quaternion q_NED_BODY =  q_y * q_NED_2_ENU * q_ENU_BODY;
         double startingYaw, startingPitch, startingRoll;
-        tf2::Matrix3x3(startingQuaternion).getEulerYPR(startingYaw, startingPitch, startingRoll);
+        tf2::Matrix3x3(q_NED_BODY).getEulerYPR(startingYaw, startingPitch, startingRoll);
         startingYaw = warp_to_pi(startingYaw);
-        if(this->verbose_){ ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* Initial yaw= " << startingYaw*RAD_TO_DEG << " pos x=" << this->startingVehiclePose_.pose.position.x << " pos y=" << this->startingVehiclePose_.pose.position.y << " pos z=" << this->startingVehiclePose_.pose.position.z); }        
+        if(this->verbose_){ ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* Initial (PX4/NED) yaw= " << startingYaw*RAD_TO_DEG << "[deg], (OptiTrack/ENU) pos x=" << this->startingVehiclePose_.pose.position.x << " pos y=" << this->startingVehiclePose_.pose.position.y << " pos z=" << this->startingVehiclePose_.pose.position.z); }        
         
 
         this->landCmd_.request.yaw =  startingYaw*RAD_TO_DEG;
