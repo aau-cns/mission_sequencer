@@ -345,28 +345,28 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
             this->publishResponse(this->missionID_, int(msg->request), true, false);
             break;
 			
-    case amaze_mission_sequencer::request::DISARM:
+        case amaze_mission_sequencer::request::DISARM:
 
-        // Preparation for arming
-        this->disarmCmd_.request.broadcast = false;
-        this->disarmCmd_.request.command = 400;
-        this->disarmCmd_.request.confirmation = 0;
-        this->disarmCmd_.request.param1 = 0.0;
-        this->disarmCmd_.request.param2 = 21196.0;
-        this->disarmCmd_.request.param3 = 0.0;
-        this->disarmCmd_.request.param4 = 0.0;
-        this->disarmCmd_.request.param5 = 0.0;
-        this->disarmCmd_.request.param6 = 0.0;
-        this->disarmCmd_.request.param7 = 0.0;
-        this->disarmRequestTime_ = ros::Time::now();
+            // Preparation for arming
+            this->disarmCmd_.request.broadcast = false;
+            this->disarmCmd_.request.command = 400;
+            this->disarmCmd_.request.confirmation = 0;
+            this->disarmCmd_.request.param1 = 0.0;
+            this->disarmCmd_.request.param2 = 21196.0;
+            this->disarmCmd_.request.param3 = 0.0;
+            this->disarmCmd_.request.param4 = 0.0;
+            this->disarmCmd_.request.param5 = 0.0;
+            this->disarmCmd_.request.param6 = 0.0;
+            this->disarmCmd_.request.param7 = 0.0;
+            this->disarmRequestTime_ = ros::Time::now();
 
-        // Set state
-        ROS_INFO_STREAM("* amaze_mission_sequencer::request::DISARM...");
-        this->currentFollowerState_ = DISARM;
-   
-        // Respond to request
-        this->publishResponse(this->missionID_, int(msg->request), true, false);
-        break;
+            // Set state
+            ROS_INFO_STREAM("* amaze_mission_sequencer::request::DISARM...");
+            this->currentFollowerState_ = DISARM;
+
+            // Respond to request
+            this->publishResponse(this->missionID_, int(msg->request), true, false);
+            break;
 
         default:
             ROS_ERROR("REQUEST NOT DEFINED");
@@ -434,12 +434,15 @@ void AmazeMissionSequencer::logic(void)
     switch (this->currentFollowerState_)
     {
         case IDLE:
+            ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* currentFollowerState__::IDLE");
             return;
 
         case PREARM:
+            ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* currentFollowerState__::PREARM");
             return;
 
         case ARM:
+            ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* currentFollowerState__::ARM");
             if (!this->currentVehicleState_.armed)
             {
                 if (this->currentVehicleState_.mode != "OFFBOARD" && (ros::Time::now().toSec() - this->offboardRequestTime_.toSec() > 2.5))
@@ -488,11 +491,13 @@ void AmazeMissionSequencer::logic(void)
                 // std::cout << "Pos: " << differencePosition << std::endl;
 
                 differenceYaw = std::abs(2.0*double(tf2::Quaternion(this->currentVehiclePose_.pose.orientation.x, this->currentVehiclePose_.pose.orientation.y,this->currentVehiclePose_.pose.orientation.z, this->currentVehiclePose_.pose.orientation.w).angle(tf2::Quaternion(currentWaypoint.pose.orientation.x, currentWaypoint.pose.orientation.y, currentWaypoint.pose.orientation.z, currentWaypoint.pose.orientation.w))));
+
                 differenceYaw = std::fmod(differenceYaw, 2*M_PI);
                 if (differenceYaw > M_PI)
                 {
                     differenceYaw -= 2*M_PI;
                 }
+
 
                 // std::cout << "Yaw: " << differenceYaw << std::endl;
                 if (!this->reachedWaypoint_ && differencePosition<this->thresholdPosition_ && std::abs(differenceYaw)<this->thresholdYaw_)
@@ -511,12 +516,14 @@ void AmazeMissionSequencer::logic(void)
                     {
                         this->vehiclePoseSetpoint_ = this->waypointToPoseStamped(this->waypointList_[0]);
                         this->reachedWaypoint_ = false;
-                    }
+                    }   
                 }
+
+                
             }
             else
             {
-                ROS_INFO_STREAM_THROTTLE(1, "* No more waypoints to follow...");
+                ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* No more waypoints to follow...");
                 if (this->rosServiceLand_.call(this->landCmd_) || this->automatically_land_)
                 {
                     if (this->landCmd_.response.success)
@@ -529,14 +536,23 @@ void AmazeMissionSequencer::logic(void)
                     }
                 }
             }
-            ROS_INFO_STREAM_THROTTLE(10, "* currentFollowerState__::MISSION; waypoints left: " << this->waypointList_.size());
+            ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* currentFollowerState__::MISSION; waypoints left: " << this->waypointList_.size());
             break;
 
         case LAND:
             if (this->currentExtendedVehicleState_.landed_state == this->currentExtendedVehicleState_.LANDED_STATE_ON_GROUND)
             {
                 this->landed_ = true;
-                ROS_INFO_STREAM_THROTTLE(10, "* currentFollowerState__::LAND  -> LANDED");
+                
+                if (!this->currentVehicleState_.armed)
+                {
+                    ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* currentFollowerState__::LAND->LANDED --> set state to IDLE");
+                    this->currentFollowerState_ = IDLE;
+                }
+                else
+                {
+                    ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* currentFollowerState__::LAND->LANDED --> Vehicle still ARMED");
+                }
             }
             break;
 
