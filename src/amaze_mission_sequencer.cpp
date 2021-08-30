@@ -161,6 +161,7 @@ bool AmazeMissionSequencer::getFilenames()
     if (!nh_.getParam("autonomy/missions/mission_" + std::to_string(this->missionID_) + "/filepaths", filepaths))
     {
         // [TODO] Manage error
+        ROS_WARN_STREAM("AmazeMissionSequencer::getFilenames(): failure! Cound not get file paths for mission:" << std::to_string(this->missionID_));
         return false;
     }
 
@@ -286,6 +287,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
             else
             {
                 if(this->verbose_){ ROS_WARN_STREAM("* amaze_mission_sequencer::request::ARM - failed! Not in PREARM!"); }
+                if(this->verbose_){ ROS_WARN_STREAM("*   Valids: Pose=" << this->poseValid_ << ", State=" << this->stateValid_ << ", extState=" << this->extendedStateValid_); } 
                 wrongInput = true;
             }
             break;
