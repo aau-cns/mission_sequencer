@@ -13,6 +13,21 @@
 #include "amaze_mission_sequencer.h"
 
 
+double warp_to_pi(double const angle_rad)
+{
+    bool is_neg = (angle_rad < 0);
+    double differenceYaw = std::fmod(abs(angle_rad), 2*M_PI);
+    if (differenceYaw > M_PI)
+    {
+        differenceYaw = std::abs(differenceYaw - 2*M_PI);
+    }
+    if (is_neg)
+    {
+        return -differenceYaw;
+    }
+    return differenceYaw;
+} 
+
 AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle &nh, ros::NodeHandle &pnh) :
   nh_(nh), pnh_(pnh)
 {
@@ -141,9 +156,21 @@ void AmazeMissionSequencer::rosExtendedVehicleStateCallback(const mavros_msgs::E
 
 void AmazeMissionSequencer::rosPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
 {
-    if (!this->poseValid_)
+    if (!this->poseValid_ || (this->currentFollowerState_ == IDLE)) 
     {
         this->startingVehiclePose_ = *msg;
+
+
+        // Initial YAW as it is used for LANDING
+        tf2::Quaternion startingQuaternion(this->startingVehiclePose_.pose.orientation.x, this->startingVehiclePose_.pose.orientation.y,this->startingVehiclePose_.pose.orientation.z, this->startingVehiclePose_.pose.orientation.w);
+        double startingYaw, startingPitch, startingRoll;
+        tf2::Matrix3x3(startingQuaternion).getEulerYPR(startingYaw, startingPitch, startingRoll);
+        startingYaw = warp_to_pi(startingYaw);
+        if(this->verbose_){ ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* Initial yaw= " << startingYaw*RAD_TO_DEG << " pos x=" << this->startingVehiclePose_.pose.position.x << " pos y=" << this->startingVehiclePose_.pose.position.y << " pos z=" << this->startingVehiclePose_.pose.position.z); }        
+        
+
+        this->landCmd_.request.yaw =  startingYaw*RAD_TO_DEG;
+        this->landCmd_.request.altitude = this->startingVehiclePose_.pose.position.z;
         this->vehiclePoseSetpoint_ = this->startingVehiclePose_;
         this->poseValid_ = true;
     }
