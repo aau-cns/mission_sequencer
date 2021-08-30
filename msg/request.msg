@@ -14,3 +14,4 @@ uint8 HOLD   = 3 # mission hold request
 uint8 RESUME = 4 # resume mission request
 uint8 ABORT  = 5 # mission aborted request - safety pilot will take manual control
 uint8 DISARM = 6 # Disarming
+uint8 LAND   = 7 # Landing

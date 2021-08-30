@@ -62,6 +62,9 @@ AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle &nh) :
       ROS_WARN("Could not retrieve threshold for yaw, setting to 0.1 rad");
       this->thresholdYaw_ = 0.1;
     }
+    std::string waypoint_fn;
+    nh.param<std::string>("/amaze_mission_sequencer/waypoint_filename", waypoint_fn, "");
+
 
     // Subscribers
     this->rosSubscriberVehicleState_ = nh.subscribe("/mavros/state", 10, &AmazeMissionSequencer::rosVehicleStateCallback, this);
@@ -78,6 +81,25 @@ AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle &nh) :
 	this->rosServiceDisrm_ = nh.serviceClient<mavros_msgs::CommandLong>("/mavros/cmd/command");
     this->rosServiceLand_ = nh.serviceClient<mavros_msgs::CommandTOL>("/mavros/cmd/land");
     this->rosServiceSetMode_ = nh.serviceClient<mavros_msgs::SetMode>("/mavros/set_mode");
+
+
+    if (!waypoint_fn.empty())
+    {
+
+        ROS_INFO_STREAM("*  Received single waypoint filename: " << waypoint_fn);
+        std::ifstream file(waypoint_fn);
+
+        if (!file) 
+        {
+            ROS_WARN_STREAM("ERROR: failed opening file: " << waypoint_fn);
+        }
+        else
+        {
+            this->filenames_.emplace_back(std::string(waypoint_fn));
+            ROS_INFO_STREAM("*  Entering PREARM state...");
+            this->currentFollowerState_ = PREARM;
+        }
+    }
 };
 
 AmazeMissionSequencer::~AmazeMissionSequencer()
@@ -160,14 +182,14 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
     // Get mission id
     if (this->missionID_ != int(msg->id))
     {
-        if (int(msg->request) == amaze_mission_sequencer::request::READ && (this->currentFollowerState_ == IDLE || this->currentFollowerState_ == PREARM))
+        if (int(msg->request) == amaze_mission_sequencer::request::READ && (this->currentFollowerState_ == IDLE || this->currentFollowerState_ == PREARM) )
         {
             this->currentFollowerState_ = IDLE;
             this->missionID_ = int(msg->id);
         }
         else
         {
-            ROS_INFO_STREAM("WRONG REQUEST FOR CURRENT STATE: " << StateStr[this->currentFollowerState_]);
+            ROS_INFO_STREAM("WRONG MISSION ID FOR CURRENT STATE: " << StateStr[this->currentFollowerState_] << "; Local mission ID:" << this->missionID_ << " msg ID: " << int(msg->id));
             // Respond if input was wrong
             this->publishResponse(this->missionID_, int(msg->request), false, false);
             return;
@@ -177,6 +199,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
     switch (int(msg->request))
     {
         case amaze_mission_sequencer::request::READ:
+            ROS_INFO_STREAM("* amaze_mission_sequencer::request::READ...");
             if (this->currentFollowerState_ == IDLE)
             {
                 try
@@ -188,7 +211,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
                         this->publishResponse(this->missionID_, int(msg->request), false, false);
                         ROS_INFO_STREAM("CAN NOT READ MISSION(S)");
                         return;
-                    }
+                    } 
 
                     // Respond that mission has been loaded
                     this->publishResponse(this->missionID_, int(msg->request), true, false);
@@ -205,13 +228,16 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
             }
             else
             {
+                ROS_WARN_STREAM("* amaze_mission_sequencer::request::READ - failed! Not in IDLE!");
                 wrongInput = true;
             }
             break;
 
         case amaze_mission_sequencer::request::ARM:
+            ROS_INFO_STREAM("* amaze_mission_sequencer::request::ARM...");
             if (this->currentFollowerState_ == PREARM && this->poseValid_ && this->stateValid_ && this->extendedStateValid_)
             {
+
                 // Take first entry of filename list
                 std::string filename = this->filenames_[0];
 
@@ -247,11 +273,13 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
             }
             else
             {
+                ROS_WARN_STREAM("* amaze_mission_sequencer::request::ARM - failed! Not in PREARM!");
                 wrongInput = true;
             }
             break;
 
         case amaze_mission_sequencer::request::HOLD:
+            ROS_INFO_STREAM("* amaze_mission_sequencer::request::HOLD...");
             if (this->currentFollowerState_ == MISSION)
             {
                 ROS_INFO_STREAM("Holding Position: x = " << this->currentVehiclePose_.pose.position.x << ", y = " << this->currentVehiclePose_.pose.position.y << ", z = " << this->currentVehiclePose_.pose.position.z);
@@ -263,10 +291,12 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
             }
             else
             {
+                ROS_WARN_STREAM("* amaze_mission_sequencer::request::HOLD - failed! Not in MISSION!");
                 wrongInput = true;
             }
             break;
         case amaze_mission_sequencer::request::RESUME:
+            ROS_INFO_STREAM("* amaze_mission_sequencer::request::RESUME...");
             if (this->currentFollowerState_ == HOLD)
             {
                 ROS_INFO_STREAM("Resuming Mission");
@@ -277,11 +307,13 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
             }
             else
             {
+                ROS_WARN_STREAM("* amaze_mission_sequencer::request::RESUME - failed! Not in HOLD!");
                 wrongInput = true;
             }
             break;
 
         case amaze_mission_sequencer::request::ABORT:
+            ROS_INFO_STREAM("* amaze_mission_sequencer::request::ABORT...");
             ROS_INFO("Abort Mission - Landing");
             if (this->rosServiceLand_.call(this->landCmd_))
             {
@@ -293,8 +325,24 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
             }
             this->currentFollowerState_ = LAND;
 
-                // Respond to request
-                this->publishResponse(this->missionID_, int(msg->request), true, false);
+            // Respond to request
+            this->publishResponse(this->missionID_, int(msg->request), true, false);
+            break;
+
+        case amaze_mission_sequencer::request::LAND:
+            ROS_INFO_STREAM("* amaze_mission_sequencer::request::LAND...");
+            if (this->rosServiceLand_.call(this->landCmd_))
+            {
+                if (this->landCmd_.response.success)
+                {
+                    ROS_INFO("Landing");
+                    this->currentFollowerState_ = LAND;
+                }
+            }
+            this->currentFollowerState_ = LAND;
+
+            // Respond to request
+            this->publishResponse(this->missionID_, int(msg->request), true, false);
             break;
 			
     case amaze_mission_sequencer::request::DISARM:
@@ -313,7 +361,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
         this->disarmRequestTime_ = ros::Time::now();
 
         // Set state
-        ROS_INFO("Disarming");
+        ROS_INFO_STREAM("* amaze_mission_sequencer::request::DISARM...");
         this->currentFollowerState_ = DISARM;
    
         // Respond to request
@@ -486,7 +534,7 @@ void AmazeMissionSequencer::logic(void)
             if (this->currentExtendedVehicleState_.landed_state == this->currentExtendedVehicleState_.LANDED_STATE_ON_GROUND)
             {
                 this->landed_ = true;
-                ROS_INFO("Landed");
+                ROS_INFO_STREAM_THROTTLE(1, "Landed");
             }
             break;
 
