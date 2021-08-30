@@ -47,7 +47,6 @@ AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle &nh, ros::NodeHandl
     this->extendedStateValid_ = false;
     this->poseValid_ = false;
 
-    this->relWaypoints_ = true;
 
 	this->landed_ = false;
 
@@ -67,6 +66,7 @@ AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle &nh, ros::NodeHandl
     pnh_.param<std::string>("waypoint_filename", waypoint_fn, "");
     pnh_.param<bool>("automatic_landing", this->automatically_land_, false);
     pnh_.param<bool>("verbose", this->verbose_, false);
+    pnh_.param<bool>("relative_waypoints", this->relWaypoints_, true);
 
 
     // Subscribers (relative to node's namespace)

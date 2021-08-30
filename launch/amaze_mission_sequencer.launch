@@ -9,6 +9,7 @@
   <arg name="waypoint_fn"             default="" />
   <arg name="auto_land"               default="False" />
   <arg name="verbose_output"          default="False" />
+  <arg name="use_relative_waypoints"  default="True" />
 
   <!-- default topic names for remapping (_i: input, _o: output)  type: sensor_msgs::Image -->
   <arg name="mavros_state_i"                    default="/mavros/state" />
@@ -33,7 +34,7 @@
     <param name="waypoint_filename"   value="$(arg waypoint_fn)" />
     <param name="automatic_landing"   value="$(arg auto_land)" />
     <param name="verbose"             value="$(arg verbose_output)" />
-
+    <param name="relative_waypoints"  value="$(arg use_relative_waypoints)" />
     <!--
     <remap from="mavros/state"                     to="$(arg mavros_state_i)" />
     <remap from="mavros/extended_state"            to="$(arg mavros_extended_state_i)" />
