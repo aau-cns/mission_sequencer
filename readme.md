@@ -47,7 +47,8 @@ uint8 LAND   = 7 # Landing
 
 A single mission file can be passed at startup and sets the sequencer in state `PREARM`.
 ```cmd
-roslaunch amaze_mission_sequencer amaze_mission_sequencer.launch waypoint_fn:=/home/jungr/workspace/NAV/development/catkin_workspaces/ansible_workspace/uwb_datarecording_aws/host_basestation/ros_ws/src/amaze_mission_sequencer/trajectories/test_trajectory.csv
+roslaunch amaze_mission_sequencer amaze_mission_sequencer.launch waypoint_fn:=<path>/amaze_mission_sequencer/trajectories/test_trajectory.csv auto_land:=True verbose_output:=True
+
 ```
 
 To execute a mission, just issue the `ARM` request. 

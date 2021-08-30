@@ -65,6 +65,8 @@ AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle &nh) :
     std::string waypoint_fn;
     nh.param<std::string>("/amaze_mission_sequencer/waypoint_filename", waypoint_fn, "");
     nh.param<bool>("/amaze_mission_sequencer/automatic_landing", this->automatically_land_, false);
+    nh.param<bool>("/amaze_mission_sequencer/verbose", this->verbose_, false);
+
 
     // Subscribers
     this->rosSubscriberVehicleState_ = nh.subscribe("/mavros/state", 10, &AmazeMissionSequencer::rosVehicleStateCallback, this);
@@ -199,7 +201,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
     switch (int(msg->request))
     {
         case amaze_mission_sequencer::request::READ:
-            ROS_INFO_STREAM("* amaze_mission_sequencer::request::READ...");
+            if(this->verbose_){ ROS_INFO_STREAM("* amaze_mission_sequencer::request::READ..."); }
             if (this->currentFollowerState_ == IDLE)
             {
                 try
@@ -228,7 +230,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
             }
             else
             {
-                ROS_WARN_STREAM("* amaze_mission_sequencer::request::READ - failed! Not in IDLE!");
+                if(this->verbose_){ ROS_WARN_STREAM("* amaze_mission_sequencer::request::READ - failed! Not in IDLE nor!"); }
                 wrongInput = true;
             }
             break;
@@ -273,13 +275,13 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
             }
             else
             {
-                ROS_WARN_STREAM("* amaze_mission_sequencer::request::ARM - failed! Not in PREARM!");
+                if(this->verbose_){ ROS_WARN_STREAM("* amaze_mission_sequencer::request::ARM - failed! Not in PREARM!"); }
                 wrongInput = true;
             }
             break;
 
         case amaze_mission_sequencer::request::HOLD:
-            ROS_INFO_STREAM("* amaze_mission_sequencer::request::HOLD...");
+            if(this->verbose_){ ROS_INFO_STREAM("* amaze_mission_sequencer::request::HOLD..."); }
             if (this->currentFollowerState_ == MISSION)
             {
                 ROS_INFO_STREAM("Holding Position: x = " << this->currentVehiclePose_.pose.position.x << ", y = " << this->currentVehiclePose_.pose.position.y << ", z = " << this->currentVehiclePose_.pose.position.z);
@@ -291,7 +293,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
             }
             else
             {
-                ROS_WARN_STREAM("* amaze_mission_sequencer::request::HOLD - failed! Not in MISSION!");
+                if(this->verbose_){ ROS_WARN_STREAM("* amaze_mission_sequencer::request::HOLD - failed! Not in MISSION!"); }
                 wrongInput = true;
             }
             break;
@@ -307,13 +309,13 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
             }
             else
             {
-                ROS_WARN_STREAM("* amaze_mission_sequencer::request::RESUME - failed! Not in HOLD!");
+                if(this->verbose_){ ROS_WARN_STREAM("* amaze_mission_sequencer::request::RESUME - failed! Not in HOLD!"); }
                 wrongInput = true;
             }
             break;
 
         case amaze_mission_sequencer::request::ABORT:
-            ROS_INFO_STREAM("* amaze_mission_sequencer::request::ABORT...");
+            if(this->verbose_){ ROS_INFO_STREAM("* amaze_mission_sequencer::request::ABORT..."); }
             ROS_INFO("Abort Mission - Landing");
             if (this->rosServiceLand_.call(this->landCmd_))
             {
@@ -330,7 +332,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
             break;
 
         case amaze_mission_sequencer::request::LAND:
-            ROS_INFO_STREAM("* amaze_mission_sequencer::request::LAND...");
+            if(this->verbose_){ ROS_INFO_STREAM("* amaze_mission_sequencer::request::LAND..."); }
             if (this->rosServiceLand_.call(this->landCmd_))
             {
                 if (this->landCmd_.response.success)
@@ -434,15 +436,15 @@ void AmazeMissionSequencer::logic(void)
     switch (this->currentFollowerState_)
     {
         case IDLE:
-            ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* currentFollowerState__::IDLE");
+            if(this->verbose_){ ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* currentFollowerState__::IDLE"); }
             return;
 
         case PREARM:
-            ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* currentFollowerState__::PREARM");
+            if(this->verbose_){ ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* currentFollowerState__::PREARM"); }
             return;
 
         case ARM:
-            ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* currentFollowerState__::ARM");
+            if(this->verbose_){ ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* currentFollowerState__::ARM"); }
             if (!this->currentVehicleState_.armed)
             {
                 if (this->currentVehicleState_.mode != "OFFBOARD" && (ros::Time::now().toSec() - this->offboardRequestTime_.toSec() > 2.5))
@@ -523,7 +525,7 @@ void AmazeMissionSequencer::logic(void)
             }
             else
             {
-                ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* No more waypoints to follow...");
+                if(this->verbose_){ ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* No more waypoints to follow..."); }
                 if (this->rosServiceLand_.call(this->landCmd_) || this->automatically_land_)
                 {
                     if (this->landCmd_.response.success)
@@ -536,7 +538,7 @@ void AmazeMissionSequencer::logic(void)
                     }
                 }
             }
-            ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* currentFollowerState__::MISSION; waypoints left: " << this->waypointList_.size());
+            if(this->verbose_){ ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* currentFollowerState__::MISSION; waypoints left: " << this->waypointList_.size()); }
             break;
 
         case LAND:
@@ -546,12 +548,12 @@ void AmazeMissionSequencer::logic(void)
                 
                 if (!this->currentVehicleState_.armed)
                 {
-                    ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* currentFollowerState__::LAND->LANDED --> set state to IDLE");
+                    if(this->verbose_){ ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* currentFollowerState__::LAND->LANDED --> set state to IDLE"); }
                     this->currentFollowerState_ = IDLE;
                 }
                 else
                 {
-                    ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* currentFollowerState__::LAND->LANDED --> Vehicle still ARMED");
+                    if(this->verbose_){ ROS_INFO_STREAM_THROTTLE(this->dbg_throttle_rate_, "* currentFollowerState__::LAND->LANDED --> Vehicle still ARMED"); }
                 }
             }
             break;

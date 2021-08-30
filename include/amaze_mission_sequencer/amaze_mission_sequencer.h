@@ -74,7 +74,8 @@ private:
 
 	bool landed_;
     bool automatically_land_ = false;
-    const size_t dbg_throttle_rate_ = 10;
+    static const size_t dbg_throttle_rate_ = 10;
+    bool verbose_ = false;
 
     ros::Subscriber rosSubscriberVehicleState_;
     ros::Subscriber rosSubscriberExtendedVehicleState_;
