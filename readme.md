@@ -50,11 +50,18 @@ A single mission file can be passed at startup and sets the sequencer in state `
 roslaunch amaze_mission_sequencer amaze_mission_sequencer.launch waypoint_fn:=/home/jungr/workspace/NAV/development/catkin_workspaces/ansible_workspace/uwb_datarecording_aws/host_basestation/ros_ws/src/amaze_mission_sequencer/trajectories/test_trajectory.csv
 ```
 
-To execute a mission, first set the file paths of mission XY and the issue the `ARM` request and finally a `LAND` or `ABORT` request.
+To execute a mission, just issue the `ARM` request. 
+If the ros param `/amaze_mission_sequencer/automatic_landing` is true, the landing command will be issued after the last waypoint was reached. After landing was detected, the sequencer will be `IDLE` again and ready to read from the mission file(s). 
 ```cmd
 # arming will execute the mission autonomously
 rostopic pub -1 /autonomy/request amaze_mission_sequencer/request '{id: 0, request: 2}'
-# the agent won't land autonomously, one has to issue the land command!
+# the agent won't land autonomously, if param automatic_land = true
+# otherise issue:
 rostopic pub -1 /autonomy/request amaze_mission_sequencer/request '{id: 0, request: 7}'
 
+
+# once the agent is landed and disarmed, it will be in IDLE, so a new waypoint file read request can be set
+rostopic pub -1 /autonomy/request amaze_mission_sequencer/request '{id: 0, request: 1}'
+# and executed again 
+rostopic pub -1 /autonomy/request amaze_mission_sequencer/request '{id: 0, request: 2}'
 ``` 
