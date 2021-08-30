@@ -77,6 +77,7 @@ private:
     bool automatically_land_ = false;
     static const size_t dbg_throttle_rate_ = 10;
     bool verbose_ = false;
+    std::string waypoint_fn_ = "";
 
     ros::Subscriber rosSubscriberVehicleState_;
     ros::Subscriber rosSubscriberExtendedVehicleState_;

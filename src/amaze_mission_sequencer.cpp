@@ -122,9 +122,7 @@ AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle &nh, ros::NodeHandl
         }
         else
         {
-            this->filenames_.emplace_back(std::string(waypoint_fn));
-            ROS_INFO_STREAM("*  Entering PREARM state...");
-            this->currentFollowerState_ = PREARM;
+            this->waypoint_fn_ = waypoint_fn;
         }
     }
 };
@@ -185,34 +183,38 @@ bool AmazeMissionSequencer::getFilenames()
     XmlRpc::XmlRpcValue filepaths;
 
     // get filepaths
-    if (!nh_.getParam("autonomy/missions/mission_" + std::to_string(this->missionID_) + "/filepaths", filepaths))
+    if(!this->waypoint_fn_.empty())
     {
-        // [TODO] Manage error
-        ROS_WARN_STREAM("AmazeMissionSequencer::getFilenames(): failure! Cound not get file paths for mission:" << std::to_string(this->missionID_));
-        return false;
-    }
-
-    // Check type to be array
-    if (filepaths.getType() ==  XmlRpc::XmlRpcValue::TypeArray)
-    {
-        // Loop through filepaths
-        for (int j = 0; j < filepaths.size(); ++j)
-        {
-            // Check type to be string
-            if (filepaths[j].getType() ==  XmlRpc::XmlRpcValue::TypeString)
-            {
-                // assign filename
-                this->filenames_.emplace_back(std::string(filepaths[j]));
-            }
-        }
-
+        this->filenames_.clear();
+        this->filenames_.emplace_back(this->waypoint_fn_);
         return true;
     }
     else
     {
-        // [TODO] Manage error
-        return false;
-    }
+        if (!nh_.getParam("autonomy/missions/mission_" + std::to_string(this->missionID_) + "/filepaths", filepaths))
+        {
+            // [TODO] Manage error
+            ROS_WARN_STREAM("AmazeMissionSequencer::getFilenames(): failure! Cound not get file paths for mission:" << std::to_string(this->missionID_));
+            return false;
+        }
+        // Check type to be array
+        if (filepaths.getType() ==  XmlRpc::XmlRpcValue::TypeArray)
+        {
+            // Loop through filepaths
+            for (int j = 0; j < filepaths.size(); ++j)
+            {
+                // Check type to be string
+                if (filepaths[j].getType() ==  XmlRpc::XmlRpcValue::TypeString)
+                {
+                    // assign filename
+                    this->filenames_.emplace_back(std::string(filepaths[j]));
+                }
+            }
+            return true;
+        }  
+    } 
+
+    return false;
 };
 
 void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::request::ConstPtr& msg)
@@ -597,44 +599,51 @@ void AmazeMissionSequencer::logic(void)
             }
             break;
 
-        case DISARM:
+        case DISARM: {
+            
+            bool is_disarmed = true;
             if (this->currentVehicleState_.armed)
             {
+                is_disarmed = false;
 				if (this->rosServiceDisrm_.call(this->disarmCmd_))
 				{
 					if (this->disarmCmd_.response.success)
 					{
-						ROS_INFO("Disarmed");
-						this->filenames_.erase(this->filenames_.begin());
-						this->waypointList_.clear();
-						if (this->filenames_.size() == 0)
-						{
-							this->currentFollowerState_ = IDLE;
-						}
-						else
-						{
-							this->currentFollowerState_ = PREARM;
-						}
+						is_disarmed = true;
 					}
 				}
-
-				// If you still want to let the PX$ check for vehicle on the ground than
-				// de-comment the following code and move the above snippent into
-				// the else condition below
-				
-				//if(!this.landed_)
-				//{
-				//	if (this->currentExtendedVehicleState_.landed_state == this->currentExtendedVehicleState_.LANDED_STATE_ON_GROUND)
-				//	{
-				//		this->landed_ = true;
-				//		ROS_INFO("Landed");
-				//	}
-				//} else {
-				//
-				//}
 			}
+            
+            if(is_disarmed) 
+            {
+                ROS_INFO("Disarmed");
+                this->filenames_.erase(this->filenames_.begin());
+                this->waypointList_.clear();
+                if (this->filenames_.size() == 0)
+                {
+                    this->currentFollowerState_ = IDLE;
+                }
+                else
+                {
+                    this->currentFollowerState_ = PREARM;
+                }
 
-            break;
+                // If you still want to let the PX$ check for vehicle on the ground than
+                // de-comment the following code and move the above snippent into
+                // the else condition below
+                
+                //if(!this.landed_)
+                //{
+                //  if (this->currentExtendedVehicleState_.landed_state == this->currentExtendedVehicleState_.LANDED_STATE_ON_GROUND)
+                //  {
+                //      this->landed_ = true;
+                //      ROS_INFO("Landed");
+                //  }
+                //} else {
+                //
+                //}                     
+            }
+            } break;
 
         case HOLD:
             break;
