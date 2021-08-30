@@ -6,12 +6,14 @@
   <arg name="threshold_yaw"         default="0.1" />
 
   <arg name="waypoint_fn" default="" />
+  <arg name="auto_land" default="False" />
 
   <!-- node -->
   <node pkg="amaze_mission_sequencer" type="amaze_mission_sequencer_node" name="amaze_mission_sequencer" output="screen" clear_params="true" required="true">
     <param name="threshold_position"  value="$(arg threshold_position)" />
     <param name="threshold_yaw"       value="$(arg threshold_yaw)" />
     <param name="waypoint_filename"   value="$(arg waypoint_fn)" />
+    <param name="automatic_landing"   value="$(arg auto_land)" />
     <!-- <remap from="/fuse_node/motor_speeds" to="/hummingbird/motor_speed"/> -->
   </node>
 </launch>

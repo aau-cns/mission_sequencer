@@ -73,6 +73,7 @@ private:
     double thresholdYaw_;
 
 	bool landed_;
+    bool automatically_land_ = false;
 
     ros::Subscriber rosSubscriberVehicleState_;
     ros::Subscriber rosSubscriberExtendedVehicleState_;

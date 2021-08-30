@@ -64,7 +64,7 @@ AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle &nh) :
     }
     std::string waypoint_fn;
     nh.param<std::string>("/amaze_mission_sequencer/waypoint_filename", waypoint_fn, "");
-
+    nh.param<bool>("/amaze_mission_sequencer/automatic_landing", this->automatically_land_, false);
 
     // Subscribers
     this->rosSubscriberVehicleState_ = nh.subscribe("/mavros/state", 10, &AmazeMissionSequencer::rosVehicleStateCallback, this);
@@ -474,7 +474,7 @@ void AmazeMissionSequencer::logic(void)
             break;
 
         case MISSION:
-            if (this->waypointList_.size() != 0)
+            if (this->waypointList_.size() > 0)
             {
                 double differencePosition;
                 double differenceYaw;
@@ -516,7 +516,8 @@ void AmazeMissionSequencer::logic(void)
             }
             else
             {
-                if (this->rosServiceLand_.call(this->landCmd_))
+                ROS_INFO_STREAM_THROTTLE(1, "* No more waypoints to follow...");
+                if (this->rosServiceLand_.call(this->landCmd_) || this->automatically_land_)
                 {
                     if (this->landCmd_.response.success)
                     {
@@ -528,18 +529,19 @@ void AmazeMissionSequencer::logic(void)
                     }
                 }
             }
+            ROS_INFO_STREAM_THROTTLE(10, "* currentFollowerState__::MISSION; waypoints left: " << this->waypointList_.size());
             break;
 
         case LAND:
             if (this->currentExtendedVehicleState_.landed_state == this->currentExtendedVehicleState_.LANDED_STATE_ON_GROUND)
             {
                 this->landed_ = true;
-                ROS_INFO_STREAM_THROTTLE(1, "Landed");
+                ROS_INFO_STREAM_THROTTLE(10, "* currentFollowerState__::LAND  -> LANDED");
             }
             break;
 
         case DISARM:
-      if (this->currentVehicleState_.armed)
+            if (this->currentVehicleState_.armed)
             {
 				if (this->rosServiceDisrm_.call(this->disarmCmd_))
 				{
