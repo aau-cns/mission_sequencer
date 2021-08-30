@@ -52,37 +52,47 @@ AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle &nh) :
 	this->landed_ = false;
 
     // Load Threshold Parameters
-    if (!nh_.getParam("/amaze_mission_sequencer/threshold_position", this->thresholdPosition_))
+    if (!nh_.getParam("threshold_position", this->thresholdPosition_))
     {
       ROS_WARN("Could not retrieve threshold for position, setting to 0.3m");
       this->thresholdPosition_ = 0.3;
     }
-    if (!nh_.getParam("/amaze_mission_sequencer/threshold_yaw", this->thresholdYaw_))
+    if (!nh_.getParam("threshold_yaw", this->thresholdYaw_))
     {
       ROS_WARN("Could not retrieve threshold for yaw, setting to 0.1 rad");
       this->thresholdYaw_ = 0.1;
     }
     std::string waypoint_fn;
-    nh.param<std::string>("/amaze_mission_sequencer/waypoint_filename", waypoint_fn, "");
-    nh.param<bool>("/amaze_mission_sequencer/automatic_landing", this->automatically_land_, false);
-    nh.param<bool>("/amaze_mission_sequencer/verbose", this->verbose_, false);
+    nh.param<std::string>("waypoint_filename", waypoint_fn, "");
+    nh.param<bool>("automatic_landing", this->automatically_land_, false);
+    nh.param<bool>("verbose", this->verbose_, false);
 
 
     // Subscribers
-    this->rosSubscriberVehicleState_ = nh.subscribe("/mavros/state", 10, &AmazeMissionSequencer::rosVehicleStateCallback, this);
-    this->rosSubscriberExtendedVehicleState_ = nh.subscribe("/mavros/extended_state", 10, &AmazeMissionSequencer::rosExtendedVehicleStateCallback, this);
-    this->rosSubscriberVehiclePose_ = nh.subscribe("/mavros/local_position/pose", 10, &AmazeMissionSequencer::rosPoseCallback, this);
-    this->rosSubscriberRequest_ = nh.subscribe("/autonomy/request", 10, &AmazeMissionSequencer::rosRequestCallback, this);
+    this->rosSubscriberVehicleState_ = nh.subscribe("/mavros_state_i", 10, &AmazeMissionSequencer::rosVehicleStateCallback, this);
+    this->rosSubscriberExtendedVehicleState_ = nh.subscribe("/mavros_extended_state_i", 10, &AmazeMissionSequencer::rosExtendedVehicleStateCallback, this);
+    this->rosSubscriberVehiclePose_ = nh.subscribe("/mavros_local_position_pose_i", 10, &AmazeMissionSequencer::rosPoseCallback, this);
+    this->rosSubscriberRequest_ = nh.subscribe("/autonomy_request_i", 10, &AmazeMissionSequencer::rosRequestCallback, this);
 
     // Publishers
-    this->rosPublisherPoseSetpoint_ = nh.advertise<geometry_msgs::PoseStamped>("/mavros/setpoint_position/local", 10);
-    this->rosPublisherResponse_ = nh.advertise<amaze_mission_sequencer::response>("/autonomy/response", 10);
+    this->rosPublisherPoseSetpoint_ = nh.advertise<geometry_msgs::PoseStamped>("/mavros_setpoint_position_local_o", 10);
+    this->rosPublisherResponse_ = nh.advertise<amaze_mission_sequencer::response>("/autonomy_response_o", 10);
 
 	// Services
-    this->rosServiceArm_ = nh.serviceClient<mavros_msgs::CommandBool>("/mavros/cmd/arming");
-	this->rosServiceDisrm_ = nh.serviceClient<mavros_msgs::CommandLong>("/mavros/cmd/command");
-    this->rosServiceLand_ = nh.serviceClient<mavros_msgs::CommandTOL>("/mavros/cmd/land");
-    this->rosServiceSetMode_ = nh.serviceClient<mavros_msgs::SetMode>("/mavros/set_mode");
+
+    std::string service_mavros_cmd_arming;
+    nh.param<std::string>("mavros_cmd_arming_o", service_mavros_cmd_arming, "/mavros/cmd/arming");
+    std::string service_mavros_cmd_command;
+    nh.param<std::string>("mavros_cmd_command_o", service_mavros_cmd_command, "/mavros/cmd/command");
+    std::string service_mavros_cmd_land;
+    nh.param<std::string>("mavros_cmd_land_o", service_mavros_cmd_land, "/mavros/cmd/land");
+    std::string service_mavros_set_mode;
+    nh.param<std::string>("mavros_set_mode_o", service_mavros_set_mode, "/mavros/set_mode");   
+
+    this->rosServiceArm_ = nh.serviceClient<mavros_msgs::CommandBool>(service_mavros_cmd_arming);
+	this->rosServiceDisrm_ = nh.serviceClient<mavros_msgs::CommandLong>(service_mavros_cmd_command);
+    this->rosServiceLand_ = nh.serviceClient<mavros_msgs::CommandTOL>(service_mavros_cmd_land);
+    this->rosServiceSetMode_ = nh.serviceClient<mavros_msgs::SetMode>(service_mavros_set_mode);
 
 
     if (!waypoint_fn.empty())

@@ -3,9 +3,12 @@
 
 int main(int argc, char **argv)
 {
-    // Node handle creation
-    ros::init(argc, argv, "amaze_mission_sequencer_node");
-    ros::NodeHandle nh("amaze_mission_sequencer_node");
+    std::string name(argv[0]);
+    ROS_INFO("%s started", name.c_str());
+    ros::init(argc, argv, name.c_str());
+
+    ros::NodeHandle nh("~");
+
 
     AmazeMissionSequencer follower(nh);
 
