@@ -26,8 +26,8 @@
 // Waypoint list
 #include "parse_waypoints.hpp"
 
-#define RAD_TO_DEG  180.0*M_PI
-#define DEG_TO_RAD  M_PI/180.0
+#define RAD_TO_DEG  (180.0/M_PI)
+#define DEG_TO_RAD  (M_PI/180.0)
 
 enum State {IDLE, PREARM, ARM, MISSION, HOLD, LAND, DISARM};
 static const char *StateStr[] = { "IDLE", "ARM", "MISSION", "HOLD", "LAND", "DISARM" };
