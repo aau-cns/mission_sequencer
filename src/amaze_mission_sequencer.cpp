@@ -89,6 +89,7 @@ AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle &nh, ros::NodeHandl
     this->rosSubscriberExtendedVehicleState_ = nh_.subscribe("mavros/extended_state", 10, &AmazeMissionSequencer::rosExtendedVehicleStateCallback, this);
     this->rosSubscriberVehiclePose_ = nh_.subscribe("mavros/local_position/pose", 10, &AmazeMissionSequencer::rosPoseCallback, this);
     this->rosSubscriberRequest_ = nh_.subscribe("autonomy/request", 10, &AmazeMissionSequencer::rosRequestCallback, this);
+    this->rosSubscriberWayPointFileName_ = pnh_.subscribe("waypoint_filename", 10, &AmazeMissionSequencer::rosWaypointFilenameCallback, this);
 
     // Publishers (relative to node's namespace)
     this->rosPublisherPoseSetpoint_ = nh_.advertise<geometry_msgs::PoseStamped>("mavros/setpoint_position/local", 10);
@@ -110,21 +111,7 @@ AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle &nh, ros::NodeHandl
     this->rosServiceSetMode_ = nh_.serviceClient<mavros_msgs::SetMode>(service_mavros_set_mode);
 
 
-    if (!waypoint_fn.empty())
-    {
-
-        ROS_INFO_STREAM("*  Received single waypoint filename: " << waypoint_fn);
-        std::ifstream file(waypoint_fn);
-
-        if (!file) 
-        {
-            ROS_WARN_STREAM("ERROR: failed opening file: " << waypoint_fn);
-        }
-        else
-        {
-            this->waypoint_fn_ = waypoint_fn;
-        }
-    }
+    this->setFilename(waypoint_fn);
 };
 
 AmazeMissionSequencer::~AmazeMissionSequencer()
@@ -224,6 +211,25 @@ bool AmazeMissionSequencer::getFilenames()
     } 
 
     return false;
+};
+
+bool AmazeMissionSequencer::setFilename(std::string const waypoint_fn)
+{
+    if (!waypoint_fn.empty())
+    {
+
+        ROS_INFO_STREAM("*  Received single waypoint filename: " << waypoint_fn);
+        std::ifstream file(waypoint_fn);
+
+        if (!file) 
+        {
+            ROS_WARN_STREAM("ERROR: failed opening file: " << waypoint_fn);
+        }
+        else
+        {
+            this->waypoint_fn_ = waypoint_fn;
+        }
+    }
 };
 
 void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::request::ConstPtr& msg)
@@ -432,6 +438,17 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
         this->publishResponse(this->missionID_, int(msg->request), false, false);
     }
 };
+
+
+void AmazeMissionSequencer::rosWaypointFilenameCallback(const std_msgs::String::ConstPtr& msg)
+{
+    std::string fn = msg->data.c_str();
+    bool res = this->setFilename(fn);
+    if (this->verbose_)
+    {
+        ROS_INFO_STREAM("Received new waypoint_filename: " << fn << "; accepted:" << res); 
+    }
+}
 
 void AmazeMissionSequencer::publishResponse(int id, int request, bool response, bool completed)
 {

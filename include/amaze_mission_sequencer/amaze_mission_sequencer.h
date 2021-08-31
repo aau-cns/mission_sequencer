@@ -7,6 +7,8 @@
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Matrix3x3.h>
 // #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <std_msgs/String.h>
+
 
 // Include Subscriber Messages
 #include <mavros_msgs/State.h>
@@ -83,6 +85,7 @@ private:
     ros::Subscriber rosSubscriberExtendedVehicleState_;
     ros::Subscriber rosSubscriberVehiclePose_;
     ros::Subscriber rosSubscriberRequest_;
+    ros::Subscriber rosSubscriberWayPointFileName_;
 
     ros::Publisher rosPublisherPoseSetpoint_;
     ros::Publisher rosPublisherResponse_;
@@ -99,12 +102,14 @@ private:
     void rosExtendedVehicleStateCallback(const mavros_msgs::ExtendedState::ConstPtr& msg);
     void rosPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
     void rosRequestCallback(const amaze_mission_sequencer::request::ConstPtr& msg);
-    
+    void rosWaypointFilenameCallback(const std_msgs::String::ConstPtr& msg);
+
     void publishResponse(int id, int request, bool response, bool completed);
 
     geometry_msgs::PoseStamped waypointToPoseStamped(const ParseWaypoint::Waypoint& waypoint);
 
     bool getFilenames();
+    bool setFilename(std::string const waypoint_fn);
 
 public:
     AmazeMissionSequencer(ros::NodeHandle &nh, ros::NodeHandle &pnh);
