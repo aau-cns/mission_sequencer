@@ -458,8 +458,12 @@ void AmazeMissionSequencer::logic(void)
                 {
                     ROS_INFO_STREAM("Waited for: " << this->waypointList_[0].holdtime << " Seconds");
                     this->waypointList_.erase(this->waypointList_.begin());
-                    this->vehiclePoseSetpoint_ = this->waypointToPoseStamped(this->waypointList_[0]);
-                    this->reachedWaypoint_ = false;
+                    // FIX(scm): make sure the list is not empty!!!
+                    if (this->waypointList_.size() != 0)
+                    {
+                        this->vehiclePoseSetpoint_ = this->waypointToPoseStamped(this->waypointList_[0]);
+                        this->reachedWaypoint_ = false;
+                    }
                 }
             }
             else
