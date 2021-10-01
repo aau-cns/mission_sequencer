@@ -440,13 +440,14 @@ void AmazeMissionSequencer::logic(void)
                 // std::cout << "Pos: " << differencePosition << std::endl;
 
                 differenceYaw = std::abs(2.0*double(tf2::Quaternion(this->currentVehiclePose_.pose.orientation.x, this->currentVehiclePose_.pose.orientation.y,this->currentVehiclePose_.pose.orientation.z, this->currentVehiclePose_.pose.orientation.w).angle(tf2::Quaternion(currentWaypoint.pose.orientation.x, currentWaypoint.pose.orientation.y, currentWaypoint.pose.orientation.z, currentWaypoint.pose.orientation.w))));
-                if (differenceYaw > 2*M_PI)
+                differenceYaw = std::fmod(differenceYaw, 2*M_PI);
+                if (differenceYaw > M_PI)
                 {
                     differenceYaw -= 2*M_PI;
                 }
 
                 // std::cout << "Yaw: " << differenceYaw << std::endl;
-                if (!this->reachedWaypoint_ && differencePosition<this->thresholdPosition_ && abs(differenceYaw)<this->thresholdYaw_)
+                if (!this->reachedWaypoint_ && differencePosition<this->thresholdPosition_ && std::abs(differenceYaw)<this->thresholdYaw_)
                 {
                     ROS_INFO_STREAM("Reached Waypoint: x = " << this->waypointList_[0].x << ", y = " << this->waypointList_[0].y << ", z = " << this->waypointList_[0].z << ", yaw = " << this->waypointList_[0].yaw);
                     this->reachedWaypoint_ = true;
