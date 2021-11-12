@@ -1,81 +1,87 @@
----
-title: amaze_waypoint_following
-author:
-  - Control of Networked Systems, University of Klagenfurt, Austria
-date: 07.12.2020
-subtitle: Version 1.0
+# AMAZE Mission sequencer
 
-documentclass: scrartcl
-numbersections: true
+## License
+This software is made available to the public to use (_source-available_), licensed under the terms of the BSD-2-Clause-License with no commercial use allowed, the full terms of which are made available in the `LICENSE` file. No license in patents is granted.
 
-toc: true
----
+<!--### Usage for academic purposes
+If you use this software in an academic research setting, please cite the
+corresponding paper and consult the `LICENSE` file for a detailed explanation.
 
-# Amaze Waypoint Following
+```latex
+@inproceedings{cite_key,
+   author   = {},
+   journal  = {},
+   title    = {},
+   year     = {2021},
+}
+```
+-->
 
-Waypoint service for a PX4 navigation setup including a minimal service client for comand line interaction.
+## Usage
 
-Maintainer: Christoph Böhm christoph.boehm@aau.at
 
-## Getting Started
+The mission sequencer has no external dependencies and listens to `/autonomy/requests` and can be lauchned via
+```cmd
+roslaunch amaze_mission_sequencer amaze_mission_sequencer.launch
 
-Clone the project into your workspace and build it in the ROS environment.
-```sh
-git clone git@gitlab.aau.at:aau-cns/amaze-waypoint-following.git
 ```
 
-## Usage (waypoint_service)
-**Build the amaze waypoint following package**
 
-```sh
-catkin build amaze_waypoint_following
+Command to set filepath to test_trajectory.csv:
+```cmd
+rosparam set /autonomy/missions/mission_0/filepaths ["/home/chriboehm/workspaces/mission_ws/src/amaze_mission_sequencer/trajectories/test_trajectory.csv"]
 ```
 
-**Run the waypoint server**
-
-```sh
-rosrun amaze_waypoint_following waypoint_service
+Pattern for command for requests:
+```cmd
+rostopic pub -1 /autonomy/request amaze_mission_sequencer/request '{id: 0, request: #}'
 ```
 
-**Ros Topics:**
 
-The node will only send waypoints if the following messages have been received:
+To execute a mission, first set the file paths of mission XY and the issue the `ARM` request and finally a `LAND` or `ABORT` request.
+```cmd
+# read mission files specified at parameter server...
+rostopic pub -1 /autonomy/request amaze_mission_sequencer/request '{id: 0, request: 1}'
+# arming will execute the mission autonomously
+rostopic pub -1 /autonomy/request amaze_mission_sequencer/request '{id: 0, request: 2}'
+# the agent won't land autonomously, one has to issue the land command!
+rostopic pub -1 /autonomy/request amaze_mission_sequencer/request '{id: 0, request: 7}'
 
-| topic                      | publisher / subscriber | type                       | content                                                      |
-| -------------------------- | ---------------------- | -------------------------- | ------------------------------------------------------------ |
-| mavros/local_position/pose | subscriber             | geometry_msgs::PoseStamped | Current pose of the vehicle                                  |
-| mavros/state               | subscriber             | mavros_msgs::State         | Current state of the vehicle (check if armed)                |
-| mavros/extended_state      | subscriber             | mavros_msgs::ExtendedState | Current estended state of the vehicle (check if landed or in air) |
-
-**Additional Topics:**
-
-| topic                          | publisher / subscriber | type                                 | content                                  |
-| ------------------------------ | ---------------------- | ------------------------------------ | ---------------------------------------- |
-| mavros/setpoint_position/local | publisher              | geometry_msgs::PoseStamped           | Publishing of the waypoint               |
-| mavros/cmd/arming              | service client         | geometry_msgs::PoseStamped           | Used for arming the vehicle              |
-| mavros/cmd/land                | service client         | mavros_msgs::CommandBool             | Used to send land comand to the vehicle  |
-| mavros/set_mode                | service client         | mavros_msgs::CommandTOL              | Used to enable the offboard mode         |
-| wp_service                     | service server         | amaze_waypoint_following::wp_service | Own service to receive waypoint requests |
-
-## Usage (waypoint_service_client)
-**Run the waypoint client:**
-
-```sh
-rosrun amaze_waypoint_following waypoint_service_client mode x y z yaw
 ```
 
-| Parameter |                                                              |
-| --------- | ------------------------------------------------------------ |
-| mode      | **0:** Landing **1:** Absolute waypoint **2:** Relative waypoint (to be implemented) |
-| x,y,z [m] | 3D coordinates of the waypoint                               |
-| yaw [deg] | Yaw of of the Vehicle                                        |
+The request IDs are specified in `msg/request.msg`.
+```yaml
+# request type definition
+uint8 UNDEF  = 0
+uint8 READ   = 1 # mission read request
+uint8 ARM    = 2 # Arming
+uint8 HOLD   = 3 # mission hold request
+uint8 RESUME = 4 # resume mission request
+uint8 ABORT  = 5 # mission aborted request - safety pilot will take manual control
+uint8 DISARM = 6 # Disarming
+uint8 LAND   = 7 # Landing
+```
 
-**Ros Topics:**
+## Launching with one Mission file
 
-| topic      | publisher / subscriber | type                                 | content               |
-| ---------- | ---------------------- | ------------------------------------ | --------------------- |
-| wp_service | service client         | amaze_waypoint_following::wp_service | Requesting a waypoint |
+A single mission file can be passed at startup and sets the sequencer in state `PREARM`.
+```cmd
+roslaunch amaze_mission_sequencer amaze_mission_sequencer.launch waypoint_fn:=<path>/amaze_mission_sequencer/trajectories/test_trajectory.csv auto_land:=True verbose_output:=True
 
-## References
+```
 
-Arming and switching to offboard mode: https://dev.px4.io/master/en/ros/mavros_offboard.html
+To execute a mission, just issue the `ARM` request.
+If the ros param `/amaze_mission_sequencer/automatic_landing` is true, the landing command will be issued after the last waypoint was reached. After landing was detected, the sequencer will be `IDLE` again and ready to read from the mission file(s).
+```cmd
+# arming will execute the mission autonomously
+rostopic pub -1 /autonomy/request amaze_mission_sequencer/request '{id: 0, request: 2}'
+# the agent won't land autonomously, if param automatic_land = true
+# otherise issue:
+rostopic pub -1 /autonomy/request amaze_mission_sequencer/request '{id: 0, request: 7}'
+
+
+# once the agent is landed and disarmed, it will be in IDLE, so a new waypoint file read request can be set
+rostopic pub -1 /autonomy/request amaze_mission_sequencer/request '{id: 0, request: 1}'
+# and executed again
+rostopic pub -1 /autonomy/request amaze_mission_sequencer/request '{id: 0, request: 2}'
+```

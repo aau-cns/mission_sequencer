@@ -11,6 +11,7 @@
   <maintainer email="beyoglu1@yahoo.com">Hikmet Beyoglu</maintainer>
   <maintainer email="christian.brommer@ieee.com">Christian Brommer</maintainer>
   <maintainer email="alessandro.fornasier@ieee.com">Alessandro Fornasier</maintainer>
+  <maintainer email="martin.scheiber@aau.at">Martin Scheiber</maintainer>
 
 
   <!-- One license tag required, multiple allowed, one license per tag -->
@@ -29,6 +30,11 @@
   <!-- Authors do not have to be maintainers, but could be -->
   <!-- Example: -->
   <!-- <author email="jane.doe@example.com">Jane Doe</author> -->
+  <author email="christian.brommer@aau.at">Christian Brommer</author>
+  <author email="christoph.boehm@aau.at">Christoph Böhm</author>
+  <author email="alessandro.fornasier@aau.at">Alessandro Fornasier</author>
+  <author email="roland.jung@aau.at">Roland Jung</author>
+  <author email="martin.scheiber@aau.at">Martin Scheiber</author>
 
 
   <!-- The *depend tags are used to specify dependencies -->
