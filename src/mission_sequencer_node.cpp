@@ -9,14 +9,14 @@ int main(int argc, char** argv)
   ros::NodeHandle nh;
   ros::NodeHandle private_nh("~");
 
-  AmazeMissionSequencer follower(nh, private_nh);
+  mission_sequencer::MissionSequencer sequencer(nh, private_nh);
 
   ros::Rate rate(20.0);
 
   while (ros::ok())
   {
-    follower.logic();  // Non-blocking logic ;)
-    follower.publishPoseSetpoint();
+    sequencer.logic();  // Non-blocking logic ;)
+    sequencer.publishPoseSetpoint();
     ros::spinOnce();
     rate.sleep();
   }

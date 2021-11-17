@@ -1,17 +1,19 @@
-// Copyright (C) 2020 Control of Networked Systems, Universit?t Klagenfurt, Austria
+// Copyright (C) 2021 Christian Brommer, Martin Scheiber, Christoph Boehm,
+// and others, Control of Networked Systems, University of Klagenfurt, Austria.
 //
 // All rights reserved.
 //
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-// THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-// DEALINGS IN THE SOFTWARE.
+// This software is licensed under the terms of the BSD-2-Clause-License with
+// no commercial use allowed, the full terms of which are made available
+// in the LICENSE file. No license in patents is granted.
+//
+// You can contact the authors at <christian.brommer@ieee.org>, 
+// <martin.scheiber@ieee.org>, and <christoph.boehm@aau.at>
 
 #include "mission_sequencer.hpp"
 
+namespace mission_sequencer
+{
 double warp_to_pi(double const angle_rad)
 {
   bool is_neg = (angle_rad < 0);
@@ -27,7 +29,7 @@ double warp_to_pi(double const angle_rad)
   return differenceYaw;
 }
 
-AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh) : nh_(nh), pnh_(pnh)
+MissionSequencer::MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh) : nh_(nh), pnh_(pnh)
 {
   currentVehicleState_ = mavros_msgs::State();
   currentExtendedVehicleState_ = mavros_msgs::ExtendedState();
@@ -83,26 +85,24 @@ AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle& nh, ros::NodeHandl
   pnh_.param<bool>("relative_waypoints", relWaypoints_, true);
 
   // Subscribers
-  rosSubscriberVehicleState_ = nh.subscribe("/mavros/state", 10, &AmazeMissionSequencer::rosVehicleStateCallback, this);
-  rosSubscriberExtendedVehicleState_ =
-      nh.subscribe("/mavros/extended_state", 10, &AmazeMissionSequencer::rosExtendedVehicleStateCallback, this);
-  rosSubscriberVehiclePose_ =
-      nh.subscribe("/mavros/local_position/pose", 10, &AmazeMissionSequencer::rosPoseCallback, this);
-  rosSubscriberRequest_ = nh.subscribe("/autonomy/request", 10, &AmazeMissionSequencer::rosRequestCallback, this);
+  sub_vehicle_state_ = nh.subscribe("/mavros/state", 10, &MissionSequencer::CbVehicleState, this);
+  sub_extended_vehicle_state_ =
+      nh.subscribe("/mavros/extended_state", 10, &MissionSequencer::CbExtendedVehicleState, this);
+  sub_vehicle_pose_ = nh.subscribe("/mavros/local_position/pose", 10, &MissionSequencer::CbPose, this);
+  sub_ms_request_ = nh.subscribe("/autonomy/request", 10, &MissionSequencer::CbMSRequest, this);
 
   // Subscribers (relative to node's namespace)
-  rosSubscriberVehicleState_ = nh_.subscribe("mavros/state", 10, &AmazeMissionSequencer::rosVehicleStateCallback, this);
-  rosSubscriberExtendedVehicleState_ =
-      nh_.subscribe("mavros/extended_state", 10, &AmazeMissionSequencer::rosExtendedVehicleStateCallback, this);
-  rosSubscriberVehiclePose_ =
-      nh_.subscribe("mavros/local_position/pose", 10, &AmazeMissionSequencer::rosPoseCallback, this);
-  rosSubscriberRequest_ = nh_.subscribe("autonomy/request", 10, &AmazeMissionSequencer::rosRequestCallback, this);
-  rosSubscriberWayPointFileName_ =
-      pnh_.subscribe("waypoint_filename", 10, &AmazeMissionSequencer::rosWaypointFilenameCallback, this);
+  sub_vehicle_state_ = nh_.subscribe("mavros/state", 10, &MissionSequencer::CbVehicleState, this);
+  sub_extended_vehicle_state_ =
+      nh_.subscribe("mavros/extended_state", 10, &MissionSequencer::CbExtendedVehicleState, this);
+  sub_vehicle_pose_ = nh_.subscribe("mavros/local_position/pose", 10, &MissionSequencer::CbPose, this);
+  sub_ms_request_ = nh_.subscribe("autonomy/request", 10, &MissionSequencer::CbMSRequest, this);
+  sub_waypoint_file_name_ =
+      pnh_.subscribe("waypoint_filename", 10, &MissionSequencer::CbWaypointFilename, this);
 
   // Publishers (relative to node's namespace)
-  rosPublisherPoseSetpoint_ = nh_.advertise<geometry_msgs::PoseStamped>("mavros/setpoint_position/local", 10);
-  rosPublisherResponse_ = nh_.advertise<mission_sequencer::MissionResponse>("autonomy/response", 10);
+  pub_pose_setpoint_ = nh_.advertise<geometry_msgs::PoseStamped>("mavros/setpoint_position/local", 10);
+  pub_ms_response_ = nh_.advertise<mission_sequencer::MissionResponse>("autonomy/response", 10);
 
   // Services (relative to node's namespace)
   std::string service_mavros_cmd_arming;
@@ -122,11 +122,11 @@ AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle& nh, ros::NodeHandl
   setFilename(waypoint_fn);
 };
 
-AmazeMissionSequencer::~AmazeMissionSequencer(){
+MissionSequencer::~MissionSequencer(){
 
 };
 
-void AmazeMissionSequencer::rosVehicleStateCallback(const mavros_msgs::State::ConstPtr& msg)
+void MissionSequencer::CbVehicleState(const mavros_msgs::State::ConstPtr& msg)
 {
   if (!stateValid_)
   {
@@ -136,7 +136,7 @@ void AmazeMissionSequencer::rosVehicleStateCallback(const mavros_msgs::State::Co
   currentVehicleState_ = *msg;
 };
 
-void AmazeMissionSequencer::rosExtendedVehicleStateCallback(const mavros_msgs::ExtendedState::ConstPtr& msg)
+void MissionSequencer::CbExtendedVehicleState(const mavros_msgs::ExtendedState::ConstPtr& msg)
 {
   if (!extendedStateValid_)
   {
@@ -146,7 +146,7 @@ void AmazeMissionSequencer::rosExtendedVehicleStateCallback(const mavros_msgs::E
   currentExtendedVehicleState_ = *msg;
 };
 
-void AmazeMissionSequencer::rosPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
+void MissionSequencer::CbPose(const geometry_msgs::PoseStamped::ConstPtr& msg)
 {
   if (!poseValid_ || (currentFollowerState_ == IDLE))
   {
@@ -185,7 +185,7 @@ void AmazeMissionSequencer::rosPoseCallback(const geometry_msgs::PoseStamped::Co
   currentVehiclePose_ = *msg;
 };
 
-bool AmazeMissionSequencer::getFilenames()
+bool MissionSequencer::getFilenames()
 {
   // Define filepaths
   XmlRpc::XmlRpcValue filepaths;
@@ -226,7 +226,7 @@ bool AmazeMissionSequencer::getFilenames()
   return false;
 };
 
-bool AmazeMissionSequencer::setFilename(std::string const waypoint_fn)
+bool MissionSequencer::setFilename(std::string const waypoint_fn)
 {
   if (!waypoint_fn.empty())
   {
@@ -244,7 +244,7 @@ bool AmazeMissionSequencer::setFilename(std::string const waypoint_fn)
   }
 };
 
-void AmazeMissionSequencer::rosRequestCallback(const mission_sequencer::MissionRequest::ConstPtr& msg)
+void MissionSequencer::CbMSRequest(const mission_sequencer::MissionRequest::ConstPtr& msg)
 {
   bool wrongInput = false;
 
@@ -482,7 +482,7 @@ void AmazeMissionSequencer::rosRequestCallback(const mission_sequencer::MissionR
   }
 };
 
-void AmazeMissionSequencer::rosWaypointFilenameCallback(const std_msgs::String::ConstPtr& msg)
+void MissionSequencer::CbWaypointFilename(const std_msgs::String::ConstPtr& msg)
 {
   std::string fn = msg->data.c_str();
   bool res = setFilename(fn);
@@ -492,7 +492,7 @@ void AmazeMissionSequencer::rosWaypointFilenameCallback(const std_msgs::String::
   }
 }
 
-void AmazeMissionSequencer::publishResponse(int id, int request, bool response, bool completed)
+void MissionSequencer::publishResponse(int id, int request, bool response, bool completed)
 {
   mission_sequencer::MissionResponse msg;
 
@@ -504,10 +504,10 @@ void AmazeMissionSequencer::publishResponse(int id, int request, bool response, 
   msg.response = response;
   msg.completed = completed;
 
-  rosPublisherResponse_.publish(msg);
+  pub_ms_response_.publish(msg);
 };
 
-geometry_msgs::PoseStamped AmazeMissionSequencer::waypointToPoseStamped(const ParseWaypoint::Waypoint& waypoint)
+geometry_msgs::PoseStamped MissionSequencer::waypointToPoseStamped(const ParseWaypoint::Waypoint& waypoint)
 {
   geometry_msgs::PoseStamped pose;
 
@@ -544,7 +544,7 @@ geometry_msgs::PoseStamped AmazeMissionSequencer::waypointToPoseStamped(const Pa
   return pose;
 };
 
-void AmazeMissionSequencer::logic(void)
+void MissionSequencer::logic(void)
 {
   switch (currentFollowerState_)
   {
@@ -763,12 +763,14 @@ void AmazeMissionSequencer::logic(void)
   }
 };
 
-void AmazeMissionSequencer::publishPoseSetpoint(void)
+void MissionSequencer::publishPoseSetpoint(void)
 {
   if (currentVehicleState_.connected && poseValid_)
   {
     vehiclePoseSetpoint_.header = std_msgs::Header();
     vehiclePoseSetpoint_.header.stamp = ros::Time::now();
-    rosPublisherPoseSetpoint_.publish(vehiclePoseSetpoint_);
+    pub_pose_setpoint_.publish(vehiclePoseSetpoint_);
   }
 };
+
+}  // namespace mission_sequencer

@@ -1,5 +1,17 @@
-#ifndef AMAZE_MISSION_SEQUENCER_H
-#define AMAZE_MISSION_SEQUENCER_H
+// Copyright (C) 2021 Martin Scheiber, Christoph Boehm,
+// and others, Control of Networked Systems, University of Klagenfurt, Austria.
+//
+// All rights reserved.
+//
+// This software is licensed under the terms of the BSD-2-Clause-License with
+// no commercial use allowed, the full terms of which are made available
+// in the LICENSE file. No license in patents is granted.
+//
+// You can contact the authors at <martin.scheiber@ieee.org>,
+// and <christoph.boehm@aau.at>
+
+#ifndef MISSION_SEQUENCER_HPP
+#define MISSION_SEQUENCER_HPP
 
 #include <math.h>
 #include <ros/ros.h>
@@ -9,10 +21,10 @@
 #include <std_msgs/String.h>
 
 // Include Subscriber Messages
-#include <mission_sequencer/MissionRequest.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <mavros_msgs/ExtendedState.h>
 #include <mavros_msgs/State.h>
+#include <mission_sequencer/MissionRequest.h>
 
 // Include Publisher Messages
 #include <mission_sequencer/MissionResponse.h>
@@ -30,6 +42,9 @@
 #define RAD_TO_DEG (180.0 / M_PI)
 #define DEG_TO_RAD (M_PI / 180.0)
 
+namespace mission_sequencer
+{
+
 enum State
 {
   IDLE,
@@ -40,15 +55,39 @@ enum State
   LAND,
   DISARM
 };
+
 static const char* StateStr[] = { "IDLE", "ARM", "MISSION", "HOLD", "LAND", "DISARM" };
 
-class AmazeMissionSequencer
+class MissionSequencer
 {
+  // ROS VARIABLES
 private:
-  /// Nodehandler
-  ros::NodeHandle nh_;
-  ros::NodeHandle pnh_;
+  // ROS Node handles
+  ros::NodeHandle nh_;   //!< ROS node handle
+  ros::NodeHandle pnh_;  //!< ROS private node handle
 
+  // ROS Publishers
+  ros::Publisher pub_pose_setpoint_;  //!< ROS publisher for current setpoint
+  ros::Publisher pub_ms_response_;  //!< ROS publisher for mission sequencer request's response. This is similar to the
+      //!< action feedback given once the request has been fullfilled.
+
+  // ROS Subscribers
+  ros::Subscriber sub_vehicle_state_;           //!< ROS subscriber for mavros vehicle state
+  ros::Subscriber sub_extended_vehicle_state_;  //!< ROS subscriber for extended mavros vehicle state
+  ros::Subscriber sub_vehicle_pose_;            //!< ROS subscriber for current vehicle pose
+  ros::Subscriber sub_ms_request_;  //!< ROS subscirber for mission sequencer request (ARM, TAKEOFF, MISSION, LAND, etc)
+  ros::Subscriber sub_waypoint_file_name_;  //!< ROS subscriber for waypoint file name
+
+  // ROS METHODS
+private:
+  void CbVehicleState(const mavros_msgs::State::ConstPtr& msg);
+  void CbExtendedVehicleState(const mavros_msgs::ExtendedState::ConstPtr& msg);
+  void CbPose(const geometry_msgs::PoseStamped::ConstPtr& msg);
+  void CbMSRequest(const mission_sequencer::MissionRequest::ConstPtr& msg);
+  void CbWaypointFilename(const std_msgs::String::ConstPtr& msg);
+
+  // REST - WIP
+private:
   mavros_msgs::State currentVehicleState_;
   mavros_msgs::ExtendedState currentExtendedVehicleState_;
   geometry_msgs::PoseStamped currentVehiclePose_;
@@ -88,15 +127,6 @@ private:
   bool verbose_ = false;
   std::string waypoint_fn_ = "";
 
-  ros::Subscriber rosSubscriberVehicleState_;
-  ros::Subscriber rosSubscriberExtendedVehicleState_;
-  ros::Subscriber rosSubscriberVehiclePose_;
-  ros::Subscriber rosSubscriberRequest_;
-  ros::Subscriber rosSubscriberWayPointFileName_;
-
-  ros::Publisher rosPublisherPoseSetpoint_;
-  ros::Publisher rosPublisherResponse_;
-
   ros::ServiceClient rosServiceArm_;
   ros::ServiceClient rosServiceDisrm_;
   ros::ServiceClient rosServiceLand_;
@@ -104,12 +134,6 @@ private:
 
   /// vector of filenames read from parameter server
   std::vector<std::string> filenames_;
-
-  void rosVehicleStateCallback(const mavros_msgs::State::ConstPtr& msg);
-  void rosExtendedVehicleStateCallback(const mavros_msgs::ExtendedState::ConstPtr& msg);
-  void rosPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
-  void rosRequestCallback(const mission_sequencer::MissionRequest::ConstPtr& msg);
-  void rosWaypointFilenameCallback(const std_msgs::String::ConstPtr& msg);
 
   void publishResponse(int id, int request, bool response, bool completed);
 
@@ -119,11 +143,16 @@ private:
   bool setFilename(std::string const waypoint_fn);
 
 public:
-  AmazeMissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh);
-  ~AmazeMissionSequencer();
+  MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh);
+  ~MissionSequencer();
 
   void logic(void);
   void publishPoseSetpoint(void);
-};
+}; // class MissionSequencer
 
-#endif
+} // namespace mission_sequencer
+
+
+
+
+#endif  // MISSION_SEQUENCER_HPP
