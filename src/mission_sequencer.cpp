@@ -33,15 +33,15 @@ MissionSequencer::MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh) : 
 {
   currentVehicleState_ = mavros_msgs::State();
   currentExtendedVehicleState_ = mavros_msgs::ExtendedState();
-  currentVehiclePose_ = geometry_msgs::PoseStamped();
+  current_vehicle_pose_ = geometry_msgs::PoseStamped();
 
-  startingVehiclePose_ = geometry_msgs::PoseStamped();
+  starting_vehicle_pose_ = geometry_msgs::PoseStamped();
 
-  vehiclePoseSetpoint_ = geometry_msgs::PoseStamped();
+  setpoint_vehicle_pose_ = geometry_msgs::PoseStamped();
 
   missionID_ = 0;
   requestNumber_ = 0;
-  currentFollowerState_ = IDLE;
+  current_sequencer_state_ = IDLE;
 
   waypointList_ = std::vector<ParseWaypoint::Waypoint>(0);
   reachedWaypoint_ = false;
@@ -57,10 +57,6 @@ MissionSequencer::MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh) : 
   landCmd_.request.altitude = 0;
   armRequestTime_ = ros::Time::now();
   offboardRequestTime_ = ros::Time::now();
-
-  stateValid_ = false;
-  extendedStateValid_ = false;
-  poseValid_ = false;
 
   relWaypoints_ = true;
 
@@ -85,20 +81,19 @@ MissionSequencer::MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh) : 
   pnh_.param<bool>("relative_waypoints", relWaypoints_, true);
 
   // Subscribers
-  sub_vehicle_state_ = nh.subscribe("/mavros/state", 10, &MissionSequencer::CbVehicleState, this);
+  sub_vehicle_state_ = nh.subscribe("/mavros/state", 10, &MissionSequencer::cbVehicleState, this);
   sub_extended_vehicle_state_ =
-      nh.subscribe("/mavros/extended_state", 10, &MissionSequencer::CbExtendedVehicleState, this);
-  sub_vehicle_pose_ = nh.subscribe("/mavros/local_position/pose", 10, &MissionSequencer::CbPose, this);
-  sub_ms_request_ = nh.subscribe("/autonomy/request", 10, &MissionSequencer::CbMSRequest, this);
+      nh.subscribe("/mavros/extended_state", 10, &MissionSequencer::cbExtendedVehicleState, this);
+  sub_vehicle_pose_ = nh.subscribe("/mavros/local_position/pose", 10, &MissionSequencer::cbPose, this);
+  sub_ms_request_ = nh.subscribe("/autonomy/request", 10, &MissionSequencer::cbMSRequest, this);
 
   // Subscribers (relative to node's namespace)
-  sub_vehicle_state_ = nh_.subscribe("mavros/state", 10, &MissionSequencer::CbVehicleState, this);
+  sub_vehicle_state_ = nh_.subscribe("mavros/state", 10, &MissionSequencer::cbVehicleState, this);
   sub_extended_vehicle_state_ =
-      nh_.subscribe("mavros/extended_state", 10, &MissionSequencer::CbExtendedVehicleState, this);
-  sub_vehicle_pose_ = nh_.subscribe("mavros/local_position/pose", 10, &MissionSequencer::CbPose, this);
-  sub_ms_request_ = nh_.subscribe("autonomy/request", 10, &MissionSequencer::CbMSRequest, this);
-  sub_waypoint_file_name_ =
-      pnh_.subscribe("waypoint_filename", 10, &MissionSequencer::CbWaypointFilename, this);
+      nh_.subscribe("mavros/extended_state", 10, &MissionSequencer::cbExtendedVehicleState, this);
+  sub_vehicle_pose_ = nh_.subscribe("mavros/local_position/pose", 10, &MissionSequencer::cbPose, this);
+  sub_ms_request_ = nh_.subscribe("autonomy/request", 10, &MissionSequencer::cbMSRequest, this);
+  sub_waypoint_file_name_ = pnh_.subscribe("waypoint_filename", 10, &MissionSequencer::cbWaypointFilename, this);
 
   // Publishers (relative to node's namespace)
   pub_pose_setpoint_ = nh_.advertise<geometry_msgs::PoseStamped>("mavros/setpoint_position/local", 10);
@@ -126,36 +121,34 @@ MissionSequencer::~MissionSequencer(){
 
 };
 
-void MissionSequencer::CbVehicleState(const mavros_msgs::State::ConstPtr& msg)
+void MissionSequencer::cbVehicleState(const mavros_msgs::State::ConstPtr& msg)
 {
-  if (!stateValid_)
-  {
-    stateValid_ = true;
-  }
-
+  b_state_is_valid_ = true;
   currentVehicleState_ = *msg;
 };
 
-void MissionSequencer::CbExtendedVehicleState(const mavros_msgs::ExtendedState::ConstPtr& msg)
+void MissionSequencer::cbExtendedVehicleState(const mavros_msgs::ExtendedState::ConstPtr& msg)
 {
-  if (!extendedStateValid_)
-  {
-    extendedStateValid_ = true;
-  }
-
+  b_extstate_is_valid_ = true;
   currentExtendedVehicleState_ = *msg;
 };
 
-void MissionSequencer::CbPose(const geometry_msgs::PoseStamped::ConstPtr& msg)
+void MissionSequencer::cbPose(const geometry_msgs::PoseStamped::ConstPtr& msg)
 {
-  if (!poseValid_ || (currentFollowerState_ == IDLE))
+  // check if starting position has been determined, i.e. the current pose is valid and MS is in IDLE
+
+  if (!b_pose_is_valid_ || (current_sequencer_state_ == SequencerState::IDLE))
   {
-    startingVehiclePose_ = *msg;
+    /// \todo make this to Eigen variable
+    starting_vehicle_pose_ = *msg;
+
+    /// \footnote this had been developed by RJ, needs to be clarified why this is needed
+    /// \todo clarify conversion from ENU to NED
 
     // Initial YAW as it is used for LANDING
     // The vehilce pose is in ENU:
-    tf2::Quaternion q_ENU_BODY(startingVehiclePose_.pose.orientation.x, startingVehiclePose_.pose.orientation.y,
-                               startingVehiclePose_.pose.orientation.z, startingVehiclePose_.pose.orientation.w);
+    tf2::Quaternion q_ENU_BODY(starting_vehicle_pose_.pose.orientation.x, starting_vehicle_pose_.pose.orientation.y,
+                               starting_vehicle_pose_.pose.orientation.z, starting_vehicle_pose_.pose.orientation.w);
 
     tf2::Quaternion q_NED_2_ENU(0, 0, 0.7071068, 0.7071068);  // [x,y,z,w]
     // q_NED_2_ENU.setRotation(tf2::Vector3(0.7071068, 0, 0.7071068), M_PI);
@@ -171,18 +164,21 @@ void MissionSequencer::CbPose(const geometry_msgs::PoseStamped::ConstPtr& msg)
     {
       ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_, "* Initial (PX4/NED) yaw= "
                                                        << startingYaw * RAD_TO_DEG << "[deg], (OptiTrack/ENU) pos x="
-                                                       << startingVehiclePose_.pose.position.x
-                                                       << " pos y=" << startingVehiclePose_.pose.position.y
-                                                       << " pos z=" << startingVehiclePose_.pose.position.z);
+                                                       << starting_vehicle_pose_.pose.position.x
+                                                       << " pos y=" << starting_vehicle_pose_.pose.position.y
+                                                       << " pos z=" << starting_vehicle_pose_.pose.position.z);
     }
 
     landCmd_.request.yaw = startingYaw * RAD_TO_DEG;
-    landCmd_.request.altitude = startingVehiclePose_.pose.position.z;
-    vehiclePoseSetpoint_ = startingVehiclePose_;
-    poseValid_ = true;
+    landCmd_.request.altitude = starting_vehicle_pose_.pose.position.z;
+
+    // set the current goal to the current pose
+    setpoint_vehicle_pose_ = starting_vehicle_pose_;
+    b_pose_is_valid_ = true;
   }
 
-  currentVehiclePose_ = *msg;
+  // update the current vehicle pose
+  current_vehicle_pose_ = *msg;
 };
 
 bool MissionSequencer::getFilenames()
@@ -244,7 +240,7 @@ bool MissionSequencer::setFilename(std::string const waypoint_fn)
   }
 };
 
-void MissionSequencer::CbMSRequest(const mission_sequencer::MissionRequest::ConstPtr& msg)
+void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::ConstPtr& msg)
 {
   bool wrongInput = false;
 
@@ -252,15 +248,16 @@ void MissionSequencer::CbMSRequest(const mission_sequencer::MissionRequest::Cons
   if (missionID_ != int(msg->id))
   {
     if (int(msg->request) == mission_sequencer::MissionRequest::READ &&
-        (currentFollowerState_ == IDLE || currentFollowerState_ == PREARM))
+        (current_sequencer_state_ == IDLE || current_sequencer_state_ == PREARM))
     {
-      currentFollowerState_ = IDLE;
+      current_sequencer_state_ = IDLE;
       missionID_ = int(msg->id);
     }
     else
     {
-      ROS_INFO_STREAM("WRONG MISSION ID FOR CURRENT STATE: " << StateStr[currentFollowerState_] << "; Local mission ID:"
-                                                             << missionID_ << " msg ID: " << int(msg->id));
+      ROS_INFO_STREAM("WRONG MISSION ID FOR CURRENT STATE: " << StateStr[current_sequencer_state_]
+                                                             << "; Local mission ID:" << missionID_
+                                                             << " msg ID: " << int(msg->id));
       // Respond if input was wrong
       publishResponse(missionID_, int(msg->request), false, false);
       return;
@@ -274,7 +271,7 @@ void MissionSequencer::CbMSRequest(const mission_sequencer::MissionRequest::Cons
       {
         ROS_INFO_STREAM("* amaze_mission_sequencer::request::READ...");
       }
-      if (currentFollowerState_ == IDLE)
+      if (current_sequencer_state_ == IDLE)
       {
         try
         {
@@ -290,7 +287,7 @@ void MissionSequencer::CbMSRequest(const mission_sequencer::MissionRequest::Cons
           // Respond that mission has been loaded
           publishResponse(missionID_, int(msg->request), true, false);
 
-          currentFollowerState_ = PREARM;
+          current_sequencer_state_ = PREARM;
         }
         catch (const std::exception& e)
         {
@@ -312,7 +309,7 @@ void MissionSequencer::CbMSRequest(const mission_sequencer::MissionRequest::Cons
 
     case mission_sequencer::MissionRequest::ARM:
       ROS_INFO_STREAM("* amaze_mission_sequencer::request::ARM...");
-      if (currentFollowerState_ == PREARM && poseValid_ && stateValid_ && extendedStateValid_)
+      if (current_sequencer_state_ == PREARM && b_pose_is_valid_ && b_state_is_valid_ && b_extstate_is_valid_)
       {
         // Take first entry of filename list
         std::string filename = filenames_[0];
@@ -327,8 +324,8 @@ void MissionSequencer::CbMSRequest(const mission_sequencer::MissionRequest::Cons
         waypointList_ = WaypointParser->getData();
 
         // Set initial pose
-        startingVehiclePose_ = currentVehiclePose_;
-        vehiclePoseSetpoint_ = startingVehiclePose_;
+        starting_vehicle_pose_ = current_vehicle_pose_;
+        setpoint_vehicle_pose_ = starting_vehicle_pose_;
 
         if (waypointList_.size() == 0)
         {
@@ -342,7 +339,7 @@ void MissionSequencer::CbMSRequest(const mission_sequencer::MissionRequest::Cons
         armCmd_.request.value = true;
         armRequestTime_ = ros::Time::now();
         offboardRequestTime_ = ros::Time::now();
-        currentFollowerState_ = ARM;
+        current_sequencer_state_ = ARM;
 
         // Respond to request
         publishResponse(missionID_, int(msg->request), true, false);
@@ -355,8 +352,8 @@ void MissionSequencer::CbMSRequest(const mission_sequencer::MissionRequest::Cons
         }
         if (verbose_)
         {
-          ROS_WARN_STREAM("*   Valids: Pose=" << poseValid_ << ", State=" << stateValid_
-                                              << ", extState=" << extendedStateValid_);
+          ROS_WARN_STREAM("*   Valids: Pose=" << b_pose_is_valid_ << ", State=" << b_state_is_valid_
+                                              << ", extState=" << b_extstate_is_valid_);
         }
         wrongInput = true;
       }
@@ -367,13 +364,13 @@ void MissionSequencer::CbMSRequest(const mission_sequencer::MissionRequest::Cons
       {
         ROS_INFO_STREAM("* amaze_mission_sequencer::request::HOLD...");
       }
-      if (currentFollowerState_ == MISSION)
+      if (current_sequencer_state_ == MISSION)
       {
-        ROS_INFO_STREAM("Holding Position: x = " << currentVehiclePose_.pose.position.x
-                                                 << ", y = " << currentVehiclePose_.pose.position.y
-                                                 << ", z = " << currentVehiclePose_.pose.position.z);
-        vehiclePoseSetpoint_ = currentVehiclePose_;
-        currentFollowerState_ = HOLD;
+        ROS_INFO_STREAM("Holding Position: x = " << current_vehicle_pose_.pose.position.x
+                                                 << ", y = " << current_vehicle_pose_.pose.position.y
+                                                 << ", z = " << current_vehicle_pose_.pose.position.z);
+        setpoint_vehicle_pose_ = current_vehicle_pose_;
+        current_sequencer_state_ = HOLD;
 
         // Respond to request
         publishResponse(missionID_, int(msg->request), true, false);
@@ -389,10 +386,10 @@ void MissionSequencer::CbMSRequest(const mission_sequencer::MissionRequest::Cons
       break;
     case mission_sequencer::MissionRequest::RESUME:
       ROS_INFO_STREAM("* amaze_mission_sequencer::request::RESUME...");
-      if (currentFollowerState_ == HOLD)
+      if (current_sequencer_state_ == HOLD)
       {
         ROS_INFO_STREAM("Resuming Mission");
-        currentFollowerState_ = MISSION;
+        current_sequencer_state_ = MISSION;
 
         // Respond to request
         publishResponse(missionID_, int(msg->request), true, false);
@@ -418,10 +415,10 @@ void MissionSequencer::CbMSRequest(const mission_sequencer::MissionRequest::Cons
         if (landCmd_.response.success)
         {
           ROS_INFO("Landing");
-          currentFollowerState_ = LAND;
+          current_sequencer_state_ = LAND;
         }
       }
-      currentFollowerState_ = LAND;
+      current_sequencer_state_ = LAND;
 
       // Respond to request
       publishResponse(missionID_, int(msg->request), true, false);
@@ -437,10 +434,10 @@ void MissionSequencer::CbMSRequest(const mission_sequencer::MissionRequest::Cons
         if (landCmd_.response.success)
         {
           ROS_INFO("Landing");
-          currentFollowerState_ = LAND;
+          current_sequencer_state_ = LAND;
         }
       }
-      currentFollowerState_ = LAND;
+      current_sequencer_state_ = LAND;
 
       // Respond to request
       publishResponse(missionID_, int(msg->request), true, false);
@@ -463,7 +460,7 @@ void MissionSequencer::CbMSRequest(const mission_sequencer::MissionRequest::Cons
 
       // Set state
       ROS_INFO_STREAM("* amaze_mission_sequencer::request::DISARM...");
-      currentFollowerState_ = DISARM;
+      current_sequencer_state_ = DISARM;
 
       // Respond to request
       publishResponse(missionID_, int(msg->request), true, false);
@@ -476,13 +473,13 @@ void MissionSequencer::CbMSRequest(const mission_sequencer::MissionRequest::Cons
 
   if (wrongInput)
   {
-    ROS_INFO_STREAM("WRONG REQUEST FOR CURRENT STATE: " << StateStr[currentFollowerState_]);
+    ROS_INFO_STREAM("WRONG REQUEST FOR CURRENT STATE: " << StateStr[current_sequencer_state_]);
     // Respond if input was wrong
     publishResponse(missionID_, int(msg->request), false, false);
   }
 };
 
-void MissionSequencer::CbWaypointFilename(const std_msgs::String::ConstPtr& msg)
+void MissionSequencer::cbWaypointFilename(const std_msgs::String::ConstPtr& msg)
 {
   std::string fn = msg->data.c_str();
   bool res = setFilename(fn);
@@ -520,9 +517,9 @@ geometry_msgs::PoseStamped MissionSequencer::waypointToPoseStamped(const ParseWa
   waypointQuaternion.normalize();
   if (relWaypoints_)
   {
-    tf2::Quaternion startingQuaternion(startingVehiclePose_.pose.orientation.x, startingVehiclePose_.pose.orientation.y,
-                                       startingVehiclePose_.pose.orientation.z,
-                                       startingVehiclePose_.pose.orientation.w);
+    tf2::Quaternion startingQuaternion(
+        starting_vehicle_pose_.pose.orientation.x, starting_vehicle_pose_.pose.orientation.y,
+        starting_vehicle_pose_.pose.orientation.z, starting_vehicle_pose_.pose.orientation.w);
 
     waypointQuaternion = startingQuaternion * waypointQuaternion;
 
@@ -530,10 +527,10 @@ geometry_msgs::PoseStamped MissionSequencer::waypointToPoseStamped(const ParseWa
     tf2::Matrix3x3(startingQuaternion).getEulerYPR(startingYaw, startingPitch, startingRoll);
 
     pose.pose.position.x =
-        (waypoint.x * cos(startingYaw) - waypoint.y * sin(startingYaw)) + startingVehiclePose_.pose.position.x;
+        (waypoint.x * cos(startingYaw) - waypoint.y * sin(startingYaw)) + starting_vehicle_pose_.pose.position.x;
     pose.pose.position.y =
-        (waypoint.x * sin(startingYaw) + waypoint.y * cos(startingYaw)) + startingVehiclePose_.pose.position.y;
-    pose.pose.position.z = waypoint.z + startingVehiclePose_.pose.position.z;
+        (waypoint.x * sin(startingYaw) + waypoint.y * cos(startingYaw)) + starting_vehicle_pose_.pose.position.y;
+    pose.pose.position.z = waypoint.z + starting_vehicle_pose_.pose.position.z;
   }
 
   pose.pose.orientation.x = waypointQuaternion[0];
@@ -546,13 +543,10 @@ geometry_msgs::PoseStamped MissionSequencer::waypointToPoseStamped(const ParseWa
 
 void MissionSequencer::logic(void)
 {
-  switch (currentFollowerState_)
+  switch (current_sequencer_state_)
   {
     case IDLE:
-      if (verbose_)
-      {
-        ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::IDLE");
-      }
+      performIdle();
       return;
 
     case PREARM:
@@ -563,214 +557,255 @@ void MissionSequencer::logic(void)
       return;
 
     case ARM:
-      if (verbose_)
-      {
-        ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::ARM");
-      }
-      if (!currentVehicleState_.armed)
-      {
-        if (currentVehicleState_.mode != "OFFBOARD" && (ros::Time::now().toSec() - offboardRequestTime_.toSec() > 2.5))
-        {
-          if (rosServiceSetMode_.call(offboardMode_) && offboardMode_.response.mode_sent)
-          {
-            ROS_INFO("Offboard enabled");
-          }
-          offboardRequestTime_ = ros::Time::now();
-        }
-        else
-        {
-          if (!currentVehicleState_.armed && (ros::Time::now().toSec() - armRequestTime_.toSec() > 2.5))
-          {
-            if (rosServiceArm_.call(armCmd_) && armCmd_.response.success)
-            {
-              ROS_INFO("Vehicle armed");
-            }
-            armRequestTime_ = ros::Time::now();
-          }
-        }
-      }
-      else
-      {
-        ROS_INFO("Starting Mission");
-        ROS_INFO("Taking off");
-        // Publish response of start
-        currentFollowerState_ = MISSION;
-        reachedWaypoint_ = false;
-        landed_ = true;
-      }
+      performArming();
       break;
 
     case MISSION:
-      if (waypointList_.size() > 0)
-      {
-        double differencePosition;
-        double differenceYaw;
-        geometry_msgs::PoseStamped currentWaypoint = waypointToPoseStamped(waypointList_[0]);
-        vehiclePoseSetpoint_ = currentWaypoint;
-
-        double differenceSquared = pow(abs(currentVehiclePose_.pose.position.x - currentWaypoint.pose.position.x), 2) +
-                                   pow(abs(currentVehiclePose_.pose.position.y - currentWaypoint.pose.position.y), 2) +
-                                   pow(abs(currentVehiclePose_.pose.position.z - currentWaypoint.pose.position.z), 2);
-        differencePosition = sqrt(differenceSquared);
-        // std::cout << "Pos: " << differencePosition << std::endl;
-
-        differenceYaw = std::abs(
-            2.0 * double(tf2::Quaternion(currentVehiclePose_.pose.orientation.x, currentVehiclePose_.pose.orientation.y,
-                                         currentVehiclePose_.pose.orientation.z, currentVehiclePose_.pose.orientation.w)
-                             .angle(tf2::Quaternion(
-                                 currentWaypoint.pose.orientation.x, currentWaypoint.pose.orientation.y,
-                                 currentWaypoint.pose.orientation.z, currentWaypoint.pose.orientation.w))));
-        differenceYaw = std::fmod(differenceYaw, 2 * M_PI);
-        if (differenceYaw > M_PI)
-        {
-          differenceYaw -= 2 * M_PI;
-        }
-
-        // std::cout << "Yaw: " << differenceYaw << std::endl;
-        if (!reachedWaypoint_ && differencePosition < thresholdPosition_ && std::abs(differenceYaw) < thresholdYaw_)
-        {
-          ROS_INFO_STREAM("Reached Waypoint: x = " << waypointList_[0].x << ", y = " << waypointList_[0].y << ", z = "
-                                                   << waypointList_[0].z << ", yaw = " << waypointList_[0].yaw);
-          reachedWaypoint_ = true;
-          reachedWaypointTime_ = ros::Time::now();
-        }
-
-        if (reachedWaypoint_ && (ros::Time::now().toSec() - reachedWaypointTime_.toSec()) > waypointList_[0].holdtime)
-        {
-          ROS_INFO_STREAM("Waited for: " << waypointList_[0].holdtime << " Seconds");
-          waypointList_.erase(waypointList_.begin());
-          // FIX(scm): make sure the list is not empty!!!
-          if (waypointList_.size() != 0)
-          {
-            vehiclePoseSetpoint_ = waypointToPoseStamped(waypointList_[0]);
-            reachedWaypoint_ = false;
-          }
-        }
-      }
-      else
-      {
-        if (verbose_)
-        {
-          ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_, "* No more waypoints to follow...");
-        }
-        if (rosServiceLand_.call(landCmd_) || automatically_land_)
-        {
-          if (landCmd_.response.success)
-          {
-            ROS_INFO("Landing");
-            currentFollowerState_ = LAND;
-
-            // Respond that mission succefully finished
-            publishResponse(missionID_, mission_sequencer::MissionRequest::UNDEF, false, true);
-          }
-        }
-      }
-      if (verbose_)
-      {
-        ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_,
-                                 "* currentFollowerState__::MISSION; waypoints left: " << waypointList_.size());
-      }
+      performMission();
       break;
 
     case LAND:
-      if (currentExtendedVehicleState_.landed_state == currentExtendedVehicleState_.LANDED_STATE_ON_GROUND)
-      {
-        landed_ = true;
-
-        if (!currentVehicleState_.armed)
-        {
-          if (verbose_)
-          {
-            ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::LAND->LANDED --> set state to "
-                                                         "IDLE");
-          }
-          currentFollowerState_ = IDLE;
-        }
-        else
-        {
-          if (verbose_)
-          {
-            ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::LAND->LANDED --> Vehicle still "
-                                                         "ARMED");
-          }
-        }
-      }
+      performLand();
       break;
 
-    case DISARM: {
-      bool is_disarmed = true;
-      if (currentVehicleState_.armed)
-      {
-        is_disarmed = false;
-        if (rosServiceDisrm_.call(disarmCmd_))
-        {
-          if (disarmCmd_.response.success)
-          {
-            is_disarmed = true;
-          }
-        }
-
-        // If you still want to let the PX$ check for vehicle on the ground than
-        // de-comment the following code and move the above snippent into
-        // the else condition below
-
-        // if(!this.landed_)
-        //{
-        //	if (currentExtendedVehicleState_.landed_state == currentExtendedVehicleState_.LANDED_STATE_ON_GROUND)
-        //	{
-        //		landed_ = true;
-        //		ROS_INFO("Landed");
-        //	}
-        //} else {
-        //
-        //}
-      }
-
-      if (is_disarmed)
-      {
-        ROS_INFO("Disarmed");
-        filenames_.erase(filenames_.begin());
-        waypointList_.clear();
-        if (filenames_.size() == 0)
-        {
-          currentFollowerState_ = IDLE;
-        }
-        else
-        {
-          currentFollowerState_ = PREARM;
-        }
-
-        // If you still want to let the PX$ check for vehicle on the ground than
-        // de-comment the following code and move the above snippent into
-        // the else condition below
-
-        // if(!this.landed_)
-        //{
-        //  if (currentExtendedVehicleState_.landed_state == currentExtendedVehicleState_.LANDED_STATE_ON_GROUND)
-        //  {
-        //      landed_ = true;
-        //      ROS_INFO("Landed");
-        //  }
-        //} else {
-        //
-        //}
-      }
-    }
-    break;
+    case DISARM:
+      performDisarming();
+      break;
 
     case HOLD:
+      performHold();
       break;
   }
 };
 
 void MissionSequencer::publishPoseSetpoint(void)
 {
-  if (currentVehicleState_.connected && poseValid_)
+  if (currentVehicleState_.connected && b_pose_is_valid_)
   {
-    vehiclePoseSetpoint_.header = std_msgs::Header();
-    vehiclePoseSetpoint_.header.stamp = ros::Time::now();
-    pub_pose_setpoint_.publish(vehiclePoseSetpoint_);
+    setpoint_vehicle_pose_.header = std_msgs::Header();
+    setpoint_vehicle_pose_.header.stamp = ros::Time::now();
+    pub_pose_setpoint_.publish(setpoint_vehicle_pose_);
   }
 };
+
+void MissionSequencer::performIdle()
+{
+  if (verbose_)
+  {
+    ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::IDLE");
+  }
+}
+
+void MissionSequencer::performArming()
+{
+  if (verbose_)
+  {
+    ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::ARM");
+  }
+  if (!currentVehicleState_.armed)
+  {
+    if (currentVehicleState_.mode != "OFFBOARD" && (ros::Time::now().toSec() - offboardRequestTime_.toSec() > 2.5))
+    {
+      if (rosServiceSetMode_.call(offboardMode_) && offboardMode_.response.mode_sent)
+      {
+        ROS_INFO("Offboard enabled");
+      }
+      offboardRequestTime_ = ros::Time::now();
+    }
+    else
+    {
+      if (!currentVehicleState_.armed && (ros::Time::now().toSec() - armRequestTime_.toSec() > 2.5))
+      {
+        if (rosServiceArm_.call(armCmd_) && armCmd_.response.success)
+        {
+          ROS_INFO("Vehicle armed");
+        }
+        armRequestTime_ = ros::Time::now();
+      }
+    }
+  }
+  else
+  {
+    ROS_INFO("Starting Mission");
+    ROS_INFO("Taking off");
+    // Publish response of start
+    current_sequencer_state_ = MISSION;
+    reachedWaypoint_ = false;
+    landed_ = true;
+  }
+}
+
+void MissionSequencer::performTakeoff()
+{
+}
+
+void MissionSequencer::performMission()
+{
+  // check if we still have waypoints in the list
+  if (waypointList_.size() > 0)
+  {
+    double differencePosition;
+    double differenceYaw;
+    geometry_msgs::PoseStamped currentWaypoint = waypointToPoseStamped(waypointList_[0]);
+    setpoint_vehicle_pose_ = currentWaypoint;
+
+    double differenceSquared = pow(abs(current_vehicle_pose_.pose.position.x - currentWaypoint.pose.position.x), 2) +
+                               pow(abs(current_vehicle_pose_.pose.position.y - currentWaypoint.pose.position.y), 2) +
+                               pow(abs(current_vehicle_pose_.pose.position.z - currentWaypoint.pose.position.z), 2);
+    differencePosition = sqrt(differenceSquared);
+    // std::cout << "Pos: " << differencePosition << std::endl;
+
+    differenceYaw = std::abs(
+        2.0 *
+        double(tf2::Quaternion(current_vehicle_pose_.pose.orientation.x, current_vehicle_pose_.pose.orientation.y,
+                               current_vehicle_pose_.pose.orientation.z, current_vehicle_pose_.pose.orientation.w)
+                   .angle(tf2::Quaternion(currentWaypoint.pose.orientation.x, currentWaypoint.pose.orientation.y,
+                                          currentWaypoint.pose.orientation.z, currentWaypoint.pose.orientation.w))));
+    differenceYaw = std::fmod(differenceYaw, 2 * M_PI);
+    if (differenceYaw > M_PI)
+    {
+      differenceYaw -= 2 * M_PI;
+    }
+
+    // std::cout << "Yaw: " << differenceYaw << std::endl;
+    if (!reachedWaypoint_ && differencePosition < thresholdPosition_ && std::abs(differenceYaw) < thresholdYaw_)
+    {
+      ROS_INFO_STREAM("Reached Waypoint: x = " << waypointList_[0].x << ", y = " << waypointList_[0].y
+                                               << ", z = " << waypointList_[0].z << ", yaw = " << waypointList_[0].yaw);
+      reachedWaypoint_ = true;
+      reachedWaypointTime_ = ros::Time::now();
+    }
+
+    if (reachedWaypoint_ && (ros::Time::now().toSec() - reachedWaypointTime_.toSec()) > waypointList_[0].holdtime)
+    {
+      ROS_INFO_STREAM("Waited for: " << waypointList_[0].holdtime << " Seconds");
+      waypointList_.erase(waypointList_.begin());
+      // FIX(scm): make sure the list is not empty!!!
+      if (waypointList_.size() != 0)
+      {
+        setpoint_vehicle_pose_ = waypointToPoseStamped(waypointList_[0]);
+        reachedWaypoint_ = false;
+      }
+    }
+  }
+  else
+  {
+    ROS_DEBUG_STREAM_THROTTLE(dbg_throttle_rate_, "* No more waypoints to follow...");
+    if (rosServiceLand_.call(landCmd_) || automatically_land_)
+    {
+      if (landCmd_.response.success)
+      {
+        ROS_INFO("Landing");
+        current_sequencer_state_ = LAND;
+
+        // Respond that mission succefully finished
+        publishResponse(missionID_, mission_sequencer::MissionRequest::UNDEF, false, true);
+      }
+    }
+  }
+  if (verbose_)
+  {
+    ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_,
+                             "* currentFollowerState__::MISSION; waypoints left: " << waypointList_.size());
+  }
+}
+
+void MissionSequencer::performHover()
+{
+}
+void MissionSequencer::performLand()
+{
+  if (currentExtendedVehicleState_.landed_state == currentExtendedVehicleState_.LANDED_STATE_ON_GROUND)
+  {
+    landed_ = true;
+
+    if (!currentVehicleState_.armed)
+    {
+      if (verbose_)
+      {
+        ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::LAND->LANDED --> set state to "
+                                                     "IDLE");
+      }
+      current_sequencer_state_ = IDLE;
+    }
+    else
+    {
+      if (verbose_)
+      {
+        ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::LAND->LANDED --> Vehicle still "
+                                                     "ARMED");
+      }
+    }
+  }
+}
+
+void MissionSequencer::performHold()
+{
+}
+
+void MissionSequencer::performDisarming()
+{
+  bool is_disarmed = true;
+  if (currentVehicleState_.armed)
+  {
+    is_disarmed = false;
+    if (rosServiceDisrm_.call(disarmCmd_))
+    {
+      if (disarmCmd_.response.success)
+      {
+        is_disarmed = true;
+      }
+    }
+
+    // If you still want to let the PX$ check for vehicle on the ground than
+    // de-comment the following code and move the above snippent into
+    // the else condition below
+
+    // if(!this.landed_)
+    //{
+    //	if (currentExtendedVehicleState_.landed_state == currentExtendedVehicleState_.LANDED_STATE_ON_GROUND)
+    //	{
+    //		landed_ = true;
+    //		ROS_INFO("Landed");
+    //	}
+    //} else {
+    //
+    //}
+  }
+
+  if (is_disarmed)
+  {
+    ROS_INFO("Disarmed");
+    filenames_.erase(filenames_.begin());
+    waypointList_.clear();
+    if (filenames_.size() == 0)
+    {
+      current_sequencer_state_ = IDLE;
+    }
+    else
+    {
+      current_sequencer_state_ = PREARM;
+    }
+
+    // If you still want to let the PX$ check for vehicle on the ground than
+    // de-comment the following code and move the above snippent into
+    // the else condition below
+
+    // if(!this.landed_)
+    //{
+    //  if (currentExtendedVehicleState_.landed_state == currentExtendedVehicleState_.LANDED_STATE_ON_GROUND)
+    //  {
+    //      landed_ = true;
+    //      ROS_INFO("Landed");
+    //  }
+    //} else {
+    //
+    //}
+  }
+}
+
+void MissionSequencer::performAbort()
+{
+}
 
 }  // namespace mission_sequencer

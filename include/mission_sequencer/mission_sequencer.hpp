@@ -44,8 +44,7 @@
 
 namespace mission_sequencer
 {
-
-enum State
+enum SequencerState
 {
   IDLE,
   PREARM,
@@ -69,7 +68,7 @@ private:
   // ROS Publishers
   ros::Publisher pub_pose_setpoint_;  //!< ROS publisher for current setpoint
   ros::Publisher pub_ms_response_;  //!< ROS publisher for mission sequencer request's response. This is similar to the
-      //!< action feedback given once the request has been fullfilled.
+                                    //!< action feedback given once the request has been fullfilled.
 
   // ROS Subscribers
   ros::Subscriber sub_vehicle_state_;           //!< ROS subscriber for mavros vehicle state
@@ -80,25 +79,68 @@ private:
 
   // ROS METHODS
 private:
-  void CbVehicleState(const mavros_msgs::State::ConstPtr& msg);
-  void CbExtendedVehicleState(const mavros_msgs::ExtendedState::ConstPtr& msg);
-  void CbPose(const geometry_msgs::PoseStamped::ConstPtr& msg);
-  void CbMSRequest(const mission_sequencer::MissionRequest::ConstPtr& msg);
-  void CbWaypointFilename(const std_msgs::String::ConstPtr& msg);
+  ///
+  /// \brief cbVehicleState ROS topic callback for the mavros vehicle state
+  /// \param msg mavros vehicle state
+  ///
+  void cbVehicleState(const mavros_msgs::State::ConstPtr& msg);
+
+  ///
+  /// \brief cbExtendedVehicleState ROS topic callback for the extended mavros vehicle state
+  /// \param msg mavros extended vehicle state
+  ///
+  void cbExtendedVehicleState(const mavros_msgs::ExtendedState::ConstPtr& msg);
+
+  ///
+  /// \brief cbPose ROS topic callback for the current vehicle pose
+  /// \param msg current vehicle pose in the 'global' navigation frame
+  ///
+  /// This callback sets the current vehicle pose used for checking waypoint reached in the mission phase.
+  /// The first time this function is called the stating_vehicle_pose_ is set to the received pose.
+  ///
+  void cbPose(const geometry_msgs::PoseStamped::ConstPtr& msg);
+
+  void cbMSRequest(const mission_sequencer::MissionRequest::ConstPtr& msg);
+  void cbWaypointFilename(const std_msgs::String::ConstPtr& msg);
+
+  // EXECUTORS
+private:
+  void performIdle();
+  void performArming();
+  void performTakeoff();
+
+  ///
+  /// \brief performMission
+  ///
+  void performMission();
+  void performHover();
+  void performLand();
+  void performHold();
+  void performDisarming();
+  void performAbort();
+
+private:
+  bool b_pose_is_valid_{ false };      //!< flag to deterimine if a valid pose has been received
+  bool b_state_is_valid_{ false };     //!< flag to determine if a valid mavros state has been received
+  bool b_extstate_is_valid_{ false };  //!< flag to determine if a valid extended mavros state has been received
+
+  // state machine
+private:
+  SequencerState current_sequencer_state_;
+
+  // navigation variables
+private:
+  geometry_msgs::PoseStamped starting_vehicle_pose_;  //!< determins the start pose of the vehicle
+  geometry_msgs::PoseStamped current_vehicle_pose_;   //!< determines the current pose of the vehicle
+  geometry_msgs::PoseStamped setpoint_vehicle_pose_;  //!< determines the setpoint (goal) pose of the vehicle
 
   // REST - WIP
 private:
   mavros_msgs::State currentVehicleState_;
   mavros_msgs::ExtendedState currentExtendedVehicleState_;
-  geometry_msgs::PoseStamped currentVehiclePose_;
-
-  geometry_msgs::PoseStamped startingVehiclePose_;
-
-  geometry_msgs::PoseStamped vehiclePoseSetpoint_;
 
   int missionID_;
   int requestNumber_;
-  State currentFollowerState_;
 
   std::vector<ParseWaypoint::Waypoint> waypointList_;
   bool reachedWaypoint_;
@@ -111,10 +153,6 @@ private:
   ros::Time armRequestTime_;
   ros::Time disarmRequestTime_;
   ros::Time offboardRequestTime_;
-
-  bool stateValid_;
-  bool extendedStateValid_;
-  bool poseValid_;
 
   bool relWaypoints_;
 
@@ -148,11 +186,8 @@ public:
 
   void logic(void);
   void publishPoseSetpoint(void);
-}; // class MissionSequencer
+};  // class MissionSequencer
 
-} // namespace mission_sequencer
-
-
-
+}  // namespace mission_sequencer
 
 #endif  // MISSION_SEQUENCER_HPP
