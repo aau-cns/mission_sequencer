@@ -1,5 +1,28 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(amaze_mission_sequencer)
+project(mission_sequencer)
+
+## Costum functions
+# Define function "source_group_by_path with three mandatory arguments (PARENT_PATH, REGEX, GROUP, ...)
+# to group source files in folders (e.g. for MSVC solutions).
+#
+# Example:
+# source_group_by_path("${CMAKE_CURRENT_SOURCE_DIR}/src" "\\\\.h$|\\\\.inl$|\\\\.cpp$|\\\\.c$|\\\\.ui$|\\\\.qrc$" "Source Files" ${sources})
+function(source_group_by_path PARENT_PATH REGEX GROUP)
+
+    foreach (FILENAME ${ARGN})
+
+        get_filename_component(FILEPATH "${FILENAME}" REALPATH)
+        file(RELATIVE_PATH FILEPATH ${PARENT_PATH} ${FILEPATH})
+        get_filename_component(FILEPATH "${FILEPATH}" DIRECTORY)
+
+        string(REPLACE "/" "\\" FILEPATH "${FILEPATH}")
+
+        source_group("${GROUP}\\${FILEPATH}" REGULAR_EXPRESSION "${REGEX}" FILES ${FILENAME})
+
+    endforeach()
+
+endfunction(source_group_by_path)
+
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 add_compile_options(-std=c++11)
@@ -52,8 +75,10 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 add_message_files(
   FILES
-  request.msg
-  response.msg
+  MissionRequest.msg
+  MissionResponse.msg
+  MissionWaypoint.msg
+  MissionWaypointArray.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -116,10 +141,35 @@ catkin_package(
 ## Build ##
 ###########
 
+## Setup header and source paths
+set(include_path "${CMAKE_CURRENT_SOURCE_DIR}/include/${PROJECT_NAME}")
+set(source_path  "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
+## Group files
+
+set(headers
+    ${include_path}/parse_waypoints.hpp
+    ${include_path}/mission_sequencer.hpp
+)
+
+set(sources
+    ${source_path}/mission_sequencer_node.cpp
+    ${source_path}/mission_sequencer.cpp
+    ${source_path}/parse_waypoints.cpp
+)
+
+## Group Source and Header files correctly
+set(header_group "Header Files (API)")
+set(source_group "Source Files")
+source_group_by_path(${include_path} "\\\\.h$|\\\\.hpp$"
+    ${header_group} ${headers})
+source_group_by_path(${source_path}  "\\\\.cpp$|\\\\.c$|\\\\.h$|\\\\.hpp$"
+    ${source_group} ${sources})
+
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-  include/amaze_mission_sequencer
+  ${include_path}
   ${catkin_INCLUDE_DIRS}
 )
 
@@ -136,7 +186,7 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(${PROJECT_NAME}_node src/amaze_mission_sequencer_node.cpp src/amaze_mission_sequencer src/parse_waypoints)
+add_executable(${PROJECT_NAME}_node ${headers} ${sources})
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the

@@ -1,4 +1,4 @@
-#include "amaze_mission_sequencer.h"
+#include "mission_sequencer.hpp"
 
 int main(int argc, char** argv)
 {

@@ -1,7 +1,7 @@
 Header header
 
 # request
-amaze_mission_sequencer/request request
+MissionRequest request
 
 # response to request (True, False)
 bool response

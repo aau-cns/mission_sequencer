@@ -10,7 +10,7 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-#include "amaze_mission_sequencer.h"
+#include "mission_sequencer.hpp"
 
 double warp_to_pi(double const angle_rad)
 {
@@ -102,7 +102,7 @@ AmazeMissionSequencer::AmazeMissionSequencer(ros::NodeHandle& nh, ros::NodeHandl
 
   // Publishers (relative to node's namespace)
   rosPublisherPoseSetpoint_ = nh_.advertise<geometry_msgs::PoseStamped>("mavros/setpoint_position/local", 10);
-  rosPublisherResponse_ = nh_.advertise<amaze_mission_sequencer::response>("autonomy/response", 10);
+  rosPublisherResponse_ = nh_.advertise<mission_sequencer::MissionResponse>("autonomy/response", 10);
 
   // Services (relative to node's namespace)
   std::string service_mavros_cmd_arming;
@@ -244,14 +244,14 @@ bool AmazeMissionSequencer::setFilename(std::string const waypoint_fn)
   }
 };
 
-void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::request::ConstPtr& msg)
+void AmazeMissionSequencer::rosRequestCallback(const mission_sequencer::MissionRequest::ConstPtr& msg)
 {
   bool wrongInput = false;
 
   // Get mission id
   if (missionID_ != int(msg->id))
   {
-    if (int(msg->request) == amaze_mission_sequencer::request::READ &&
+    if (int(msg->request) == mission_sequencer::MissionRequest::READ &&
         (currentFollowerState_ == IDLE || currentFollowerState_ == PREARM))
     {
       currentFollowerState_ = IDLE;
@@ -269,7 +269,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
 
   switch (int(msg->request))
   {
-    case amaze_mission_sequencer::request::READ:
+    case mission_sequencer::MissionRequest::READ:
       if (verbose_)
       {
         ROS_INFO_STREAM("* amaze_mission_sequencer::request::READ...");
@@ -310,7 +310,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
       }
       break;
 
-    case amaze_mission_sequencer::request::ARM:
+    case mission_sequencer::MissionRequest::ARM:
       ROS_INFO_STREAM("* amaze_mission_sequencer::request::ARM...");
       if (currentFollowerState_ == PREARM && poseValid_ && stateValid_ && extendedStateValid_)
       {
@@ -362,7 +362,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
       }
       break;
 
-    case amaze_mission_sequencer::request::HOLD:
+    case mission_sequencer::MissionRequest::HOLD:
       if (verbose_)
       {
         ROS_INFO_STREAM("* amaze_mission_sequencer::request::HOLD...");
@@ -387,7 +387,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
         wrongInput = true;
       }
       break;
-    case amaze_mission_sequencer::request::RESUME:
+    case mission_sequencer::MissionRequest::RESUME:
       ROS_INFO_STREAM("* amaze_mission_sequencer::request::RESUME...");
       if (currentFollowerState_ == HOLD)
       {
@@ -407,7 +407,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
       }
       break;
 
-    case amaze_mission_sequencer::request::ABORT:
+    case mission_sequencer::MissionRequest::ABORT:
       if (verbose_)
       {
         ROS_INFO_STREAM("* amaze_mission_sequencer::request::ABORT...");
@@ -427,7 +427,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
       publishResponse(missionID_, int(msg->request), true, false);
       break;
 
-    case amaze_mission_sequencer::request::LAND:
+    case mission_sequencer::MissionRequest::LAND:
       if (verbose_)
       {
         ROS_INFO_STREAM("* amaze_mission_sequencer::request::LAND...");
@@ -446,7 +446,7 @@ void AmazeMissionSequencer::rosRequestCallback(const amaze_mission_sequencer::re
       publishResponse(missionID_, int(msg->request), true, false);
       break;
 
-    case amaze_mission_sequencer::request::DISARM:
+    case mission_sequencer::MissionRequest::DISARM:
 
       // Preparation for arming
       disarmCmd_.request.broadcast = false;
@@ -494,7 +494,7 @@ void AmazeMissionSequencer::rosWaypointFilenameCallback(const std_msgs::String::
 
 void AmazeMissionSequencer::publishResponse(int id, int request, bool response, bool completed)
 {
-  amaze_mission_sequencer::response msg;
+  mission_sequencer::MissionResponse msg;
 
   // TODO: add request topics part
   msg.header = std_msgs::Header();
@@ -661,7 +661,7 @@ void AmazeMissionSequencer::logic(void)
             currentFollowerState_ = LAND;
 
             // Respond that mission succefully finished
-            publishResponse(missionID_, amaze_mission_sequencer::request::UNDEF, false, true);
+            publishResponse(missionID_, mission_sequencer::MissionRequest::UNDEF, false, true);
           }
         }
       }

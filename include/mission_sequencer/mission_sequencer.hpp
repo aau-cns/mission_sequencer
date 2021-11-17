@@ -9,13 +9,14 @@
 #include <std_msgs/String.h>
 
 // Include Subscriber Messages
-#include <amaze_mission_sequencer/request.h>
+#include <mission_sequencer/MissionRequest.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <mavros_msgs/ExtendedState.h>
 #include <mavros_msgs/State.h>
 
 // Include Publisher Messages
-#include <amaze_mission_sequencer/response.h>
+#include <mission_sequencer/MissionResponse.h>
+#include <mission_sequencer/MissionWaypointArray.h>
 
 // Include Services
 #include <mavros_msgs/CommandBool.h>
@@ -107,7 +108,7 @@ private:
   void rosVehicleStateCallback(const mavros_msgs::State::ConstPtr& msg);
   void rosExtendedVehicleStateCallback(const mavros_msgs::ExtendedState::ConstPtr& msg);
   void rosPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
-  void rosRequestCallback(const amaze_mission_sequencer::request::ConstPtr& msg);
+  void rosRequestCallback(const mission_sequencer::MissionRequest::ConstPtr& msg);
   void rosWaypointFilenameCallback(const std_msgs::String::ConstPtr& msg);
 
   void publishResponse(int id, int request, bool response, bool completed);
