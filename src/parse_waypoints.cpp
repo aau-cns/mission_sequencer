@@ -5,25 +5,27 @@
 
 #include "parse_waypoints.hpp"
 
-ParseWaypoint::ParseWaypoint(std::string &filename, std::vector<std::string> &categories):
-  filename_(filename), categories_(categories) {}
+ParseWaypoint::ParseWaypoint(std::string& filename, std::vector<std::string>& categories)
+  : filename_(filename), categories_(categories)
+{
+}
 
-void ParseWaypoint::getIndices(const std::vector<std::string> &header, std::vector<int> &indices) {
-
+void ParseWaypoint::getIndices(const std::vector<std::string>& header, std::vector<int>& indices)
+{
   // Temporary index
   int idx;
 
   // Get indices
-  for (const auto &it : categories_) {
-
+  for (const auto& it : categories_)
+  {
     // Get index
     getIndex(header, it, idx);
     indices.push_back(idx);
   }
 }
 
-void ParseWaypoint::parseLine(std::string &line, std::vector<std::string> &data) {
-
+void ParseWaypoint::parseLine(std::string& line, std::vector<std::string>& data)
+{
   // Create a stringstream of the current line
   std::stringstream ss(line);
 
@@ -31,20 +33,23 @@ void ParseWaypoint::parseLine(std::string &line, std::vector<std::string> &data)
   std::string tmp;
 
   // Extract each cell
-  while (std::getline(ss, tmp, ',')) {
+  while (std::getline(ss, tmp, ','))
+  {
     data.push_back(tmp);
   }
 }
 
-void ParseWaypoint::readParseCsv() {
-
+void ParseWaypoint::readParseCsv()
+{
   std::ifstream file(filename_);
 
-  if (!file) {
+  if (!file)
+  {
     throw std::runtime_error("Error opening file \"" + filename_ + "\". Exit programm.");
   }
 
-  std::cout << "\n----------------------------------------" << std::endl << "File: " << filename_ << " successfully open." << std::endl;
+  std::cout << "\n----------------------------------------" << std::endl
+            << "File: " << filename_ << " successfully open." << std::endl;
 
   // Line, header and data
   std::string line;
@@ -67,7 +72,8 @@ void ParseWaypoint::readParseCsv() {
     parseLine(line, header);
 
     // Read data, line by line
-    while (std::getline(file, line)) {
+    while (std::getline(file, line))
+    {
       std::vector<double> tmp;
       parseLine(line, tmp);
       data.push_back(tmp);
@@ -81,8 +87,8 @@ void ParseWaypoint::readParseCsv() {
     data_.clear();
 
     // Loop through the data (lines) and fill the data structure
-    for (const auto &it : data) {
-
+    for (const auto& it : data)
+    {
       // Temporary waypoint data structure
       Waypoint tmp;
 
@@ -92,9 +98,12 @@ void ParseWaypoint::readParseCsv() {
       tmp.y = it.at(indices.at(1));
       tmp.z = it.at(indices.at(2));
       tmp.yaw = it.at(indices.at(3));
-      if (indices.size() > 4) {
+      if (indices.size() > 4)
+      {
         tmp.holdtime = it.at(indices.at(4));
-      } else {
+      }
+      else
+      {
         tmp.holdtime = 0;
       }
       data_.push_back(tmp);
@@ -105,10 +114,15 @@ void ParseWaypoint::readParseCsv() {
   std::cout << "File read successfully." << std::endl << "----------------------------------------\n" << std::endl;
 }
 
-const std::vector<ParseWaypoint::Waypoint> &ParseWaypoint::getData() const {
-  if(!data_.empty()) {
+const std::vector<ParseWaypoint::Waypoint>& ParseWaypoint::getData() const
+{
+  if (!data_.empty())
+  {
     return data_;
-  } else {
-    throw std::runtime_error("Trying to get data from empty structure, something went wrong when parsing .csv input file...");
+  }
+  else
+  {
+    throw std::runtime_error("Trying to get data from empty structure, something went wrong when parsing .csv input "
+                             "file...");
   }
 }
