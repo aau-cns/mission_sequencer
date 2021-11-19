@@ -23,9 +23,44 @@ function(source_group_by_path PARENT_PATH REGEX GROUP)
 
 endfunction(source_group_by_path)
 
+## Determine CMAKE options
+if (NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE "Release")
+endif()
 
-## Compile as C++11, supported in ROS Kinetic and newer
-add_compile_options(-std=c++11)
+
+## Compile with highest possible c++ standard
+# http://stackoverflow.com/a/25836953
+include(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG("-std=c++20" COMPILER_SUPPORTS_CXX20)
+CHECK_CXX_COMPILER_FLAG("-std=c++17" COMPILER_SUPPORTS_CXX17)
+CHECK_CXX_COMPILER_FLAG("-std=c++14" COMPILER_SUPPORTS_CXX14)
+CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
+if(COMPILER_SUPPORTS_CXX20)
+    set(CMAKE_CXX_STANDARD 20)
+elseif(COMPILER_SUPPORTS_CXX17)
+    set(CMAKE_CXX_STANDARD 17)
+elseif(COMPILER_SUPPORTS_CXX11)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+elseif(COMPILER_SUPPORTS_CXX0X)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+else()
+    message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++0x support. Please use a different C++ compiler.")
+endif()
+
+## Set CMAKE compile flags
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
+#  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fomit-frame-pointer -fno-signed-zeros")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fsee -fomit-frame-pointer -fno-signed-zeros -fno-math-errno -funroll-loops -Wno-dev")
+elseif (CMAKE_BUILD_TYPE STREQUAL "Debug")
+#  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g3")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g3 -Wall -Wuninitialized -Wmaybe-uninitialized -fno-omit-frame-pointer")
+endif ()
+
+message("Build Type: " ${CMAKE_BUILD_TYPE})
+message(WARNING "CMAKE_CXX_FLAGES: ${CMAKE_CXX_FLAGS}")
+
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -148,6 +183,8 @@ set(source_path  "${CMAKE_CURRENT_SOURCE_DIR}/src")
 ## Group files
 
 set(headers
+    ${include_path}/types/sequencer_types.hpp
+    ${include_path}/types/sequencer_options.hpp
     ${include_path}/parse_waypoints.hpp
     ${include_path}/mission_sequencer.hpp
 )
