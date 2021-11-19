@@ -58,9 +58,9 @@ MissionSequencer::MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh) : 
   armRequestTime_ = ros::Time::now();
   offboardRequestTime_ = ros::Time::now();
 
-  relWaypoints_ = true;
+  b_wp_are_relativ_ = true;
 
-  landed_ = false;
+  b_is_landed_ = false;
 
   // ros::NodeHandle private_nh("~");
   // Load Parameters (privately)
@@ -76,9 +76,9 @@ MissionSequencer::MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh) : 
   }
   std::string waypoint_fn;
   pnh_.param<std::string>("waypoint_filename", waypoint_fn, "");
-  pnh_.param<bool>("automatic_landing", automatically_land_, false);
-  pnh_.param<bool>("verbose", verbose_, false);
-  pnh_.param<bool>("relative_waypoints", relWaypoints_, true);
+  pnh_.param<bool>("automatic_landing", b_do_automatically_land_, false);
+  pnh_.param<bool>("verbose", b_do_verbose_, false);
+  pnh_.param<bool>("relative_waypoints", b_wp_are_relativ_, true);
 
   // Subscribers
   sub_vehicle_state_ = nh.subscribe("/mavros/state", 10, &MissionSequencer::cbVehicleState, this);
@@ -109,10 +109,10 @@ MissionSequencer::MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh) : 
   std::string service_mavros_set_mode;
   pnh_.param<std::string>("mavros_set_mode_o", service_mavros_set_mode, "mavros/set_mode");
 
-  rosServiceArm_ = nh_.serviceClient<mavros_msgs::CommandBool>(service_mavros_cmd_arming);
-  rosServiceDisrm_ = nh_.serviceClient<mavros_msgs::CommandLong>(service_mavros_cmd_command);
-  rosServiceLand_ = nh_.serviceClient<mavros_msgs::CommandTOL>(service_mavros_cmd_land);
-  rosServiceSetMode_ = nh_.serviceClient<mavros_msgs::SetMode>(service_mavros_set_mode);
+  srv_mavros_arm_ = nh_.serviceClient<mavros_msgs::CommandBool>(service_mavros_cmd_arming);
+  srv_mavros_disarm_ = nh_.serviceClient<mavros_msgs::CommandLong>(service_mavros_cmd_command);
+  srv_mavros_land_ = nh_.serviceClient<mavros_msgs::CommandTOL>(service_mavros_cmd_land);
+  srv_mavros_set_mode_ = nh_.serviceClient<mavros_msgs::SetMode>(service_mavros_set_mode);
 
   setFilename(waypoint_fn);
 };
@@ -160,7 +160,7 @@ void MissionSequencer::cbPose(const geometry_msgs::PoseStamped::ConstPtr& msg)
     double startingYaw, startingPitch, startingRoll;
     tf2::Matrix3x3(q_NED_BODY).getEulerYPR(startingYaw, startingPitch, startingRoll);
     startingYaw = warp_to_pi(startingYaw);
-    if (verbose_)
+    if (b_do_verbose_)
     {
       ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_, "* Initial (PX4/NED) yaw= "
                                                        << startingYaw * RAD_TO_DEG << "[deg], (OptiTrack/ENU) pos x="
@@ -267,7 +267,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
   switch (int(msg->request))
   {
     case mission_sequencer::MissionRequest::READ:
-      if (verbose_)
+      if (b_do_verbose_)
       {
         ROS_INFO_STREAM("* amaze_mission_sequencer::request::READ...");
       }
@@ -299,7 +299,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       }
       else
       {
-        if (verbose_)
+        if (b_do_verbose_)
         {
           ROS_WARN_STREAM("* amaze_mission_sequencer::request::READ - failed! Not in IDLE nor!");
         }
@@ -346,11 +346,11 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       }
       else
       {
-        if (verbose_)
+        if (b_do_verbose_)
         {
           ROS_WARN_STREAM("* amaze_mission_sequencer::request::ARM - failed! Not in PREARM!");
         }
-        if (verbose_)
+        if (b_do_verbose_)
         {
           ROS_WARN_STREAM("*   Valids: Pose=" << b_pose_is_valid_ << ", State=" << b_state_is_valid_
                                               << ", extState=" << b_extstate_is_valid_);
@@ -360,7 +360,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       break;
 
     case mission_sequencer::MissionRequest::HOLD:
-      if (verbose_)
+      if (b_do_verbose_)
       {
         ROS_INFO_STREAM("* amaze_mission_sequencer::request::HOLD...");
       }
@@ -377,7 +377,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       }
       else
       {
-        if (verbose_)
+        if (b_do_verbose_)
         {
           ROS_WARN_STREAM("* amaze_mission_sequencer::request::HOLD - failed! Not in MISSION!");
         }
@@ -396,7 +396,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       }
       else
       {
-        if (verbose_)
+        if (b_do_verbose_)
         {
           ROS_WARN_STREAM("* amaze_mission_sequencer::request::RESUME - failed! Not in HOLD!");
         }
@@ -405,12 +405,12 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       break;
 
     case mission_sequencer::MissionRequest::ABORT:
-      if (verbose_)
+      if (b_do_verbose_)
       {
         ROS_INFO_STREAM("* amaze_mission_sequencer::request::ABORT...");
       }
       ROS_INFO("Abort Mission - Landing");
-      if (rosServiceLand_.call(landCmd_))
+      if (srv_mavros_land_.call(landCmd_))
       {
         if (landCmd_.response.success)
         {
@@ -425,11 +425,11 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       break;
 
     case mission_sequencer::MissionRequest::LAND:
-      if (verbose_)
+      if (b_do_verbose_)
       {
         ROS_INFO_STREAM("* amaze_mission_sequencer::request::LAND...");
       }
-      if (rosServiceLand_.call(landCmd_))
+      if (srv_mavros_land_.call(landCmd_))
       {
         if (landCmd_.response.success)
         {
@@ -483,7 +483,7 @@ void MissionSequencer::cbWaypointFilename(const std_msgs::String::ConstPtr& msg)
 {
   std::string fn = msg->data.c_str();
   bool res = setFilename(fn);
-  if (verbose_)
+  if (b_do_verbose_)
   {
     ROS_INFO_STREAM("Received new waypoint_filename: " << fn << "; accepted:" << res);
   }
@@ -515,7 +515,7 @@ geometry_msgs::PoseStamped MissionSequencer::waypointToPoseStamped(const ParseWa
   tf2::Quaternion waypointQuaternion;
   waypointQuaternion.setRotation(tf2::Vector3(0, 0, 1), waypoint.yaw * DEG_TO_RAD);
   waypointQuaternion.normalize();
-  if (relWaypoints_)
+  if (b_wp_are_relativ_)
   {
     tf2::Quaternion startingQuaternion(
         starting_vehicle_pose_.pose.orientation.x, starting_vehicle_pose_.pose.orientation.y,
@@ -550,7 +550,7 @@ void MissionSequencer::logic(void)
       return;
 
     case PREARM:
-      if (verbose_)
+      if (b_do_verbose_)
       {
         ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::PREARM");
       }
@@ -590,7 +590,7 @@ void MissionSequencer::publishPoseSetpoint(void)
 
 void MissionSequencer::performIdle()
 {
-  if (verbose_)
+  if (b_do_verbose_)
   {
     ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::IDLE");
   }
@@ -598,7 +598,7 @@ void MissionSequencer::performIdle()
 
 void MissionSequencer::performArming()
 {
-  if (verbose_)
+  if (b_do_verbose_)
   {
     ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::ARM");
   }
@@ -606,7 +606,7 @@ void MissionSequencer::performArming()
   {
     if (currentVehicleState_.mode != "OFFBOARD" && (ros::Time::now().toSec() - offboardRequestTime_.toSec() > 2.5))
     {
-      if (rosServiceSetMode_.call(offboardMode_) && offboardMode_.response.mode_sent)
+      if (srv_mavros_set_mode_.call(offboardMode_) && offboardMode_.response.mode_sent)
       {
         ROS_INFO("Offboard enabled");
       }
@@ -616,7 +616,7 @@ void MissionSequencer::performArming()
     {
       if (!currentVehicleState_.armed && (ros::Time::now().toSec() - armRequestTime_.toSec() > 2.5))
       {
-        if (rosServiceArm_.call(armCmd_) && armCmd_.response.success)
+        if (srv_mavros_arm_.call(armCmd_) && armCmd_.response.success)
         {
           ROS_INFO("Vehicle armed");
         }
@@ -631,7 +631,7 @@ void MissionSequencer::performArming()
     // Publish response of start
     current_sequencer_state_ = MISSION;
     reachedWaypoint_ = false;
-    landed_ = true;
+    b_is_landed_ = true;
   }
 }
 
@@ -691,7 +691,7 @@ void MissionSequencer::performMission()
   else
   {
     ROS_DEBUG_STREAM_THROTTLE(dbg_throttle_rate_, "* No more waypoints to follow...");
-    if (rosServiceLand_.call(landCmd_) || automatically_land_)
+    if (srv_mavros_land_.call(landCmd_) || b_do_automatically_land_)
     {
       if (landCmd_.response.success)
       {
@@ -703,7 +703,7 @@ void MissionSequencer::performMission()
       }
     }
   }
-  if (verbose_)
+  if (b_do_verbose_)
   {
     ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_,
                              "* currentFollowerState__::MISSION; waypoints left: " << waypointList_.size());
@@ -717,11 +717,11 @@ void MissionSequencer::performLand()
 {
   if (currentExtendedVehicleState_.landed_state == currentExtendedVehicleState_.LANDED_STATE_ON_GROUND)
   {
-    landed_ = true;
+    b_is_landed_ = true;
 
     if (!currentVehicleState_.armed)
     {
-      if (verbose_)
+      if (b_do_verbose_)
       {
         ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::LAND->LANDED --> set state to "
                                                      "IDLE");
@@ -730,7 +730,7 @@ void MissionSequencer::performLand()
     }
     else
     {
-      if (verbose_)
+      if (b_do_verbose_)
       {
         ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::LAND->LANDED --> Vehicle still "
                                                      "ARMED");
@@ -749,7 +749,7 @@ void MissionSequencer::performDisarming()
   if (currentVehicleState_.armed)
   {
     is_disarmed = false;
-    if (rosServiceDisrm_.call(disarmCmd_))
+    if (srv_mavros_disarm_.call(disarmCmd_))
     {
       if (disarmCmd_.response.success)
       {

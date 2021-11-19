@@ -77,6 +77,12 @@ private:
   ros::Subscriber sub_ms_request_;  //!< ROS subscirber for mission sequencer request (ARM, TAKEOFF, MISSION, LAND, etc)
   ros::Subscriber sub_waypoint_file_name_;  //!< ROS subscriber for waypoint file name
 
+  // ROS Service Clients
+  ros::ServiceClient srv_mavros_arm_;       //!< ROS service client to the 'arm' mavros interface
+  ros::ServiceClient srv_mavros_disarm_;    //!< ROS service client to the 'disarm' mavros interface
+  ros::ServiceClient srv_mavros_land_;      //!< ROS service client to the 'land' mavros interface
+  ros::ServiceClient srv_mavros_set_mode_;  //!< ROS service client to the 'set mode' mavros interface
+
   // ROS METHODS
 private:
   ///
@@ -103,6 +109,8 @@ private:
   void cbMSRequest(const mission_sequencer::MissionRequest::ConstPtr& msg);
   void cbWaypointFilename(const std_msgs::String::ConstPtr& msg);
 
+  void publishResponse(int id, int request, bool response, bool completed);
+
   // EXECUTORS
 private:
   void performIdle();
@@ -120,9 +128,14 @@ private:
   void performAbort();
 
 private:
-  bool b_pose_is_valid_{ false };      //!< flag to deterimine if a valid pose has been received
-  bool b_state_is_valid_{ false };     //!< flag to determine if a valid mavros state has been received
-  bool b_extstate_is_valid_{ false };  //!< flag to determine if a valid extended mavros state has been received
+  bool b_pose_is_valid_{ false };          //!< flag to determine if a valid pose has been received
+  bool b_state_is_valid_{ false };         //!< flag to determine if a valid mavros state has been received
+  bool b_extstate_is_valid_{ false };      //!< flag to determine if a valid extended mavros state has been received
+  bool b_is_landed_{ true };               //!< flag to determine if the vehicle has landed
+  bool b_do_automatically_land_{ false };  //!< flag to determine if vehicle should automatically land
+  bool b_wp_are_relativ_{ false };         //!< flag to determine if waypoints are relative to starting position
+  bool b_do_verbose_{ false };             //!< flag to determine if debug output should be verbosed
+                                //!< \deprecated will be removed in next version and replaced by the ROS debug flag
 
   // state machine
 private:
@@ -154,26 +167,14 @@ private:
   ros::Time disarmRequestTime_;
   ros::Time offboardRequestTime_;
 
-  bool relWaypoints_;
-
   double thresholdPosition_;
   double thresholdYaw_;
 
-  bool landed_;
-  bool automatically_land_ = false;
   static const size_t dbg_throttle_rate_ = 10;
-  bool verbose_ = false;
   std::string waypoint_fn_ = "";
-
-  ros::ServiceClient rosServiceArm_;
-  ros::ServiceClient rosServiceDisrm_;
-  ros::ServiceClient rosServiceLand_;
-  ros::ServiceClient rosServiceSetMode_;
 
   /// vector of filenames read from parameter server
   std::vector<std::string> filenames_;
-
-  void publishResponse(int id, int request, bool response, bool completed);
 
   geometry_msgs::PoseStamped waypointToPoseStamped(const ParseWaypoint::Waypoint& waypoint);
 
