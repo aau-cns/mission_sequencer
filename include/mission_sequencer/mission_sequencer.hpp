@@ -38,23 +38,14 @@
 
 // Waypoint list
 #include "parse_waypoints.hpp"
+#include "types/sequencer_options.hpp"
+#include "types/sequencer_types.hpp"
 
 #define RAD_TO_DEG (180.0 / M_PI)
 #define DEG_TO_RAD (M_PI / 180.0)
 
 namespace mission_sequencer
 {
-enum SequencerState
-{
-  IDLE,
-  PREARM,
-  ARM,
-  MISSION,
-  HOLD,
-  LAND,
-  DISARM
-};
-
 static const char* StateStr[] = { "IDLE", "ARM", "MISSION", "HOLD", "LAND", "DISARM" };
 
 class MissionSequencer
@@ -109,12 +100,33 @@ private:
   void cbMSRequest(const mission_sequencer::MissionRequest::ConstPtr& msg);
   void cbWaypointFilename(const std_msgs::String::ConstPtr& msg);
 
-  void publishResponse(int id, int request, bool response, bool completed);
+  ///
+  /// \brief publishResponse publishes the reponse to a mission request onto the ROS network
+  /// \param id mission ID in use
+  /// \param request requested state
+  /// \param response reply if transition to new state is approved
+  /// \param completed reply if state task has been completed
+  ///
+  /// The possible outcome of the request and thus published response are displayed in the table below
+  /// <table>
+  /// <caption id="multi_row">Possible Response situations</caption>
+  /// <tr><th>publish time              <th>response  <th>completed <th>description
+  /// <tr><td>immediatly after request  <td>0         <td> 0        <td>request denied
+  /// <tr><td>immediatly after request  <td>1         <td> 0        <td>request accepted, not executed yet
+  /// <tr><td>immediatly after request  <td>1         <td> 1        <td>request accepted and executed
+  /// <tr><td>any time after request    <td>0         <td> 1        <td>previous request has been executed
+  /// </table>
+  ///
+  void publishResponse(const uint8_t& id, const uint8_t& request, const bool& response, const bool& completed) const;
 
   // EXECUTORS
 private:
   void performIdle();
   void performArming();
+
+  ///
+  /// \brief performTakeoff performs the takeoff based on the selected type
+  ///
   void performTakeoff();
 
   ///
@@ -132,32 +144,37 @@ private:
   bool b_state_is_valid_{ false };         //!< flag to determine if a valid mavros state has been received
   bool b_extstate_is_valid_{ false };      //!< flag to determine if a valid extended mavros state has been received
   bool b_is_landed_{ true };               //!< flag to determine if the vehicle has landed
+  bool b_do_auto_state_change_{ false };   //!< flag to determine if state changes should happen automatically or per
+                                           //!< request
   bool b_do_automatically_land_{ false };  //!< flag to determine if vehicle should automatically land
   bool b_wp_are_relativ_{ false };         //!< flag to determine if waypoints are relative to starting position
+  bool b_wp_is_reached_{ false };          //!< flag to determine if waypoint has been reached
   bool b_do_verbose_{ false };             //!< flag to determine if debug output should be verbosed
                                 //!< \deprecated will be removed in next version and replaced by the ROS debug flag
 
   // state machine
 private:
   SequencerState current_sequencer_state_;
+  SequencerState previous_sequencer_state_;
+  MissionSequencerOptions sequencer_params_;
 
   // navigation variables
 private:
-  geometry_msgs::PoseStamped starting_vehicle_pose_;  //!< determins the start pose of the vehicle
+  geometry_msgs::PoseStamped starting_vehicle_pose_;  //!< determines the start pose of the vehicle
   geometry_msgs::PoseStamped current_vehicle_pose_;   //!< determines the current pose of the vehicle
   geometry_msgs::PoseStamped setpoint_vehicle_pose_;  //!< determines the setpoint (goal) pose of the vehicle
+  geometry_msgs::PoseStamped setpoint_takeoff_pose_;  //!< determines the setpoint (goal) pose for takeoff
 
+  mavros_msgs::State current_vehicle_state_;              //!< determines the current vehicle mavros state
+  mavros_msgs::ExtendedState current_vehicle_ext_state_;  //!< determines the current vehcile extended mavros state
+
+  uint8_t current_mission_ID_;
   // REST - WIP
 private:
-  mavros_msgs::State currentVehicleState_;
-  mavros_msgs::ExtendedState currentExtendedVehicleState_;
-
-  int missionID_;
   int requestNumber_;
 
   std::vector<ParseWaypoint::Waypoint> waypointList_;
-  bool reachedWaypoint_;
-  ros::Time reachedWaypointTime_;
+  ros::Time time_last_wp_reached_;
 
   mavros_msgs::SetMode offboardMode_;
   mavros_msgs::CommandBool armCmd_;
@@ -180,6 +197,9 @@ private:
 
   bool getFilenames();
   bool setFilename(std::string const waypoint_fn);
+
+  bool checkWaypoint(const geometry_msgs::PoseStamped& current_waypoint);
+  bool checkStateChange(const SequencerState new_state) const;
 
 public:
   MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh);

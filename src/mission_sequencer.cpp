@@ -29,23 +29,22 @@ double warp_to_pi(double const angle_rad)
   return differenceYaw;
 }
 
-MissionSequencer::MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh) : nh_(nh), pnh_(pnh)
+MissionSequencer::MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh)
+  : nh_(nh), pnh_(pnh), current_sequencer_state_{ SequencerState::IDLE }
 {
-  currentVehicleState_ = mavros_msgs::State();
-  currentExtendedVehicleState_ = mavros_msgs::ExtendedState();
+  current_vehicle_state_ = mavros_msgs::State();
+  current_vehicle_ext_state_ = mavros_msgs::ExtendedState();
   current_vehicle_pose_ = geometry_msgs::PoseStamped();
 
   starting_vehicle_pose_ = geometry_msgs::PoseStamped();
 
   setpoint_vehicle_pose_ = geometry_msgs::PoseStamped();
 
-  missionID_ = 0;
+  current_mission_ID_ = 0;
   requestNumber_ = 0;
-  current_sequencer_state_ = IDLE;
 
   waypointList_ = std::vector<ParseWaypoint::Waypoint>(0);
-  reachedWaypoint_ = false;
-  reachedWaypointTime_ = ros::Time::now();
+  time_last_wp_reached_ = ros::Time::now();
 
   filenames_ = std::vector<std::string>(0);
 
@@ -124,13 +123,13 @@ MissionSequencer::~MissionSequencer(){
 void MissionSequencer::cbVehicleState(const mavros_msgs::State::ConstPtr& msg)
 {
   b_state_is_valid_ = true;
-  currentVehicleState_ = *msg;
+  current_vehicle_state_ = *msg;
 };
 
 void MissionSequencer::cbExtendedVehicleState(const mavros_msgs::ExtendedState::ConstPtr& msg)
 {
   b_extstate_is_valid_ = true;
-  currentExtendedVehicleState_ = *msg;
+  current_vehicle_ext_state_ = *msg;
 };
 
 void MissionSequencer::cbPose(const geometry_msgs::PoseStamped::ConstPtr& msg)
@@ -195,11 +194,11 @@ bool MissionSequencer::getFilenames()
   }
   else
   {
-    if (!nh_.getParam("autonomy/missions/mission_" + std::to_string(missionID_) + "/filepaths", filepaths))
+    if (!nh_.getParam("autonomy/missions/mission_" + std::to_string(current_mission_ID_) + "/filepaths", filepaths))
     {
       // [TODO] Manage error
       ROS_WARN_STREAM("AmazeMissionSequencer::getFilenames(): failure! Cound not get file paths for mission:"
-                      << std::to_string(missionID_));
+                      << std::to_string(current_mission_ID_));
       return false;
     }
     // Check type to be array
@@ -242,138 +241,132 @@ bool MissionSequencer::setFilename(std::string const waypoint_fn)
 
 void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::ConstPtr& msg)
 {
-  bool wrongInput = false;
+  bool b_wrong_input = false;
 
   // Get mission id
-  if (missionID_ != int(msg->id))
+  if (current_mission_ID_ != int(msg->id))
   {
     if (int(msg->request) == mission_sequencer::MissionRequest::READ &&
         (current_sequencer_state_ == IDLE || current_sequencer_state_ == PREARM))
     {
       current_sequencer_state_ = IDLE;
-      missionID_ = int(msg->id);
+      current_mission_ID_ = int(msg->id);
     }
     else
     {
       ROS_INFO_STREAM("WRONG MISSION ID FOR CURRENT STATE: " << StateStr[current_sequencer_state_]
-                                                             << "; Local mission ID:" << missionID_
+                                                             << "; Local mission ID:" << current_mission_ID_
                                                              << " msg ID: " << int(msg->id));
       // Respond if input was wrong
-      publishResponse(missionID_, int(msg->request), false, false);
+      publishResponse(current_mission_ID_, int(msg->request), false, false);
       return;
     }
   }
 
-  switch (int(msg->request))
+  // main request state machine
+  switch (msg->request)
   {
-    case mission_sequencer::MissionRequest::READ:
-      if (b_do_verbose_)
-      {
-        ROS_INFO_STREAM("* amaze_mission_sequencer::request::READ...");
-      }
-      if (current_sequencer_state_ == IDLE)
-      {
-        try
-        {
-          // Get filepaths
-          if (!getFilenames())
-          {
-            // Respond that mission could not be loaded
-            publishResponse(missionID_, int(msg->request), false, false);
-            ROS_INFO_STREAM("CAN NOT READ MISSION(S)");
-            return;
-          }
-
-          // Respond that mission has been loaded
-          publishResponse(missionID_, int(msg->request), true, false);
-
-          current_sequencer_state_ = PREARM;
-        }
-        catch (const std::exception& e)
-        {
-          // Respond that mission could not be loaded
-          publishResponse(missionID_, int(msg->request), false, false);
-          ROS_INFO_STREAM("CAN NOT READ MISSION(S) - Exception");
-          std::cerr << e.what() << '\n';
-        }
-      }
-      else
-      {
-        if (b_do_verbose_)
-        {
-          ROS_WARN_STREAM("* amaze_mission_sequencer::request::READ - failed! Not in IDLE nor!");
-        }
-        wrongInput = true;
-      }
-      break;
-
+      // arming, no takeoff
     case mission_sequencer::MissionRequest::ARM:
       ROS_INFO_STREAM("* amaze_mission_sequencer::request::ARM...");
-      if (current_sequencer_state_ == PREARM && b_pose_is_valid_ && b_state_is_valid_ && b_extstate_is_valid_)
+      if (current_sequencer_state_ == SequencerState::PREARM && b_pose_is_valid_ && b_state_is_valid_ &&
+          b_extstate_is_valid_)
       {
-        // Take first entry of filename list
-        std::string filename = filenames_[0];
+        //        // Take first entry of filename list
+        //        std::string filename = filenames_[0];
 
-        std::vector<std::string> header_default = { "x", "y", "z", "yaw", "holdtime" };
-        std::shared_ptr<ParseWaypoint> WaypointParser = std::make_shared<ParseWaypoint>(filename, header_default);
+        //        std::vector<std::string> header_default = { "x", "y", "z", "yaw", "holdtime" };
+        //        std::shared_ptr<ParseWaypoint> WaypointParser = std::make_shared<ParseWaypoint>(filename,
+        //        header_default);
 
-        // Parse waypoint file
-        WaypointParser->readParseCsv();
+        //        // Parse waypoint file
+        //        WaypointParser->readParseCsv();
 
-        // Get the data
-        waypointList_ = WaypointParser->getData();
+        //        // Get the data
+        //        waypointList_ = WaypointParser->getData();
 
         // Set initial pose
         starting_vehicle_pose_ = current_vehicle_pose_;
         setpoint_vehicle_pose_ = starting_vehicle_pose_;
 
-        if (waypointList_.size() == 0)
-        {
-          // Error if waypoint list is empty
-          publishResponse(missionID_, int(msg->request), false, false);
-          ROS_INFO_STREAM("MISSION FILE EMPTY");
-          return;
-        }
+        //        if (waypointList_.size() == 0)
+        //        {
+        //          // Error if waypoint list is empty
+        //          publishResponse(missionID_, int(msg->request), false, false);
+        //          ROS_INFO_STREAM("MISSION FILE EMPTY");
+        //          return;
+        //        }
 
         // Preparation for arming
         armCmd_.request.value = true;
         armRequestTime_ = ros::Time::now();
         offboardRequestTime_ = ros::Time::now();
-        current_sequencer_state_ = ARM;
+        current_sequencer_state_ = SequencerState::ARM;
 
         // Respond to request
-        publishResponse(missionID_, int(msg->request), true, false);
+        publishResponse(current_mission_ID_, int(msg->request), true, false);
       }
       else
       {
         if (b_do_verbose_)
         {
           ROS_WARN_STREAM("* amaze_mission_sequencer::request::ARM - failed! Not in PREARM!");
-        }
-        if (b_do_verbose_)
-        {
           ROS_WARN_STREAM("*   Valids: Pose=" << b_pose_is_valid_ << ", State=" << b_state_is_valid_
                                               << ", extState=" << b_extstate_is_valid_);
         }
-        wrongInput = true;
+        b_wrong_input = true;
       }
       break;
 
-    case mission_sequencer::MissionRequest::HOLD:
-      if (b_do_verbose_)
+    case mission_sequencer::MissionRequest::TAKEOFF: {
+      ROS_DEBUG_STREAM("* amaze_mission_sequencer::request::TAKEOFF...");
+      // check if change is approved
+      /// \todo TODO(scm): if enum conversion from string exists (or int) then this can be put outside the switch
+      if (checkStateChange(SequencerState::TAKEOFF))
       {
-        ROS_INFO_STREAM("* amaze_mission_sequencer::request::HOLD...");
-      }
-      if (current_sequencer_state_ == MISSION)
-      {
-        ROS_INFO_STREAM("Holding Position: x = " << current_vehicle_pose_.pose.position.x
-                                                 << ", y = " << current_vehicle_pose_.pose.position.y
-                                                 << ", z = " << current_vehicle_pose_.pose.position.z);
-        setpoint_vehicle_pose_ = current_vehicle_pose_;
-        current_sequencer_state_ = HOLD;
+        // state change to TAKEOFF is approved
+        if (sequencer_params_.takeoff_type_ == TakeoffType::POSITION)
+        {
+          // set starting position if they are relative
+          if (sequencer_params_.b_wp_are_relative_)
+            starting_vehicle_pose_ = current_vehicle_pose_;
 
-        // Respond to request
-        publishResponse(missionID_, int(msg->request), true, false);
+          // set takeoff position
+          setpoint_takeoff_pose_ = starting_vehicle_pose_;
+          setpoint_takeoff_pose_.pose.position.z += sequencer_params_.takeoff_z_;
+
+          // set waypoint reached to false and transition to new state
+          b_wp_is_reached_ = false;
+          current_sequencer_state_ = SequencerState::TAKEOFF;
+        }
+        else
+        {
+          ROS_ERROR_STREAM("=> TakeoffType not implemented");
+        }
+      }
+      break;
+    }
+
+    case mission_sequencer::MissionRequest::HOLD: {
+      ROS_DEBUG_STREAM("* amaze_mission_sequencer::request::HOLD...");
+      // check if change is approved
+      if (checkStateChange(SequencerState::HOLD))
+      {
+        // save previous state
+        previous_sequencer_state_ = current_sequencer_state_;
+        ROS_DEBUG_STREAM("- prehold state: " << previous_sequencer_state_);
+
+        // set holding position
+        setpoint_vehicle_pose_ = current_vehicle_pose_;
+        ROS_INFO_STREAM("Holding Position: x = " << setpoint_vehicle_pose_.pose.position.x
+                                                 << ", y = " << setpoint_vehicle_pose_.pose.position.y
+                                                 << ", z = " << setpoint_vehicle_pose_.pose.position.z);
+
+        // transition to new state
+        current_sequencer_state_ = SequencerState::HOLD;
+
+        // respond to request --> completed immediatly
+        publishResponse(current_mission_ID_, msg->request, true, true);
       }
       else
       {
@@ -381,18 +374,24 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
         {
           ROS_WARN_STREAM("* amaze_mission_sequencer::request::HOLD - failed! Not in MISSION!");
         }
-        wrongInput = true;
+        b_wrong_input = true;
       }
       break;
-    case mission_sequencer::MissionRequest::RESUME:
+    }
+
+    case mission_sequencer::MissionRequest::RESUME: {
       ROS_INFO_STREAM("* amaze_mission_sequencer::request::RESUME...");
-      if (current_sequencer_state_ == HOLD)
+      // check if change is approved
+      if (checkStateChange(previous_sequencer_state_))
       {
         ROS_INFO_STREAM("Resuming Mission");
-        current_sequencer_state_ = MISSION;
 
-        // Respond to request
-        publishResponse(missionID_, int(msg->request), true, false);
+        // transition to new state
+        current_sequencer_state_ = previous_sequencer_state_;
+        previous_sequencer_state_ = SequencerState::HOLD;
+
+        // respond to request --> completed immediatly
+        publishResponse(current_mission_ID_, msg->request, true, true);
       }
       else
       {
@@ -400,9 +399,10 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
         {
           ROS_WARN_STREAM("* amaze_mission_sequencer::request::RESUME - failed! Not in HOLD!");
         }
-        wrongInput = true;
+        b_wrong_input = true;
       }
       break;
+    }
 
     case mission_sequencer::MissionRequest::ABORT:
       if (b_do_verbose_)
@@ -421,7 +421,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       current_sequencer_state_ = LAND;
 
       // Respond to request
-      publishResponse(missionID_, int(msg->request), true, false);
+      publishResponse(current_mission_ID_, int(msg->request), true, false);
       break;
 
     case mission_sequencer::MissionRequest::LAND:
@@ -440,7 +440,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       current_sequencer_state_ = LAND;
 
       // Respond to request
-      publishResponse(missionID_, int(msg->request), true, false);
+      publishResponse(current_mission_ID_, int(msg->request), true, false);
       break;
 
     case mission_sequencer::MissionRequest::DISARM:
@@ -463,7 +463,48 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       current_sequencer_state_ = DISARM;
 
       // Respond to request
-      publishResponse(missionID_, int(msg->request), true, false);
+      publishResponse(current_mission_ID_, int(msg->request), true, false);
+      break;
+
+    case mission_sequencer::MissionRequest::READ:
+      if (b_do_verbose_)
+      {
+        ROS_INFO_STREAM("* amaze_mission_sequencer::request::READ...");
+      }
+      if (current_sequencer_state_ == IDLE)
+      {
+        try
+        {
+          // Get filepaths
+          if (!getFilenames())
+          {
+            // Respond that mission could not be loaded
+            publishResponse(current_mission_ID_, int(msg->request), false, false);
+            ROS_INFO_STREAM("CAN NOT READ MISSION(S)");
+            return;
+          }
+
+          // Respond that mission has been loaded
+          publishResponse(current_mission_ID_, int(msg->request), true, false);
+
+          current_sequencer_state_ = PREARM;
+        }
+        catch (const std::exception& e)
+        {
+          // Respond that mission could not be loaded
+          publishResponse(current_mission_ID_, int(msg->request), false, false);
+          ROS_INFO_STREAM("CAN NOT READ MISSION(S) - Exception");
+          std::cerr << e.what() << '\n';
+        }
+      }
+      else
+      {
+        if (b_do_verbose_)
+        {
+          ROS_WARN_STREAM("* amaze_mission_sequencer::request::READ - failed! Not in IDLE nor!");
+        }
+        b_wrong_input = true;
+      }
       break;
 
     default:
@@ -471,11 +512,11 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       break;
   }
 
-  if (wrongInput)
+  if (b_wrong_input)
   {
     ROS_INFO_STREAM("WRONG REQUEST FOR CURRENT STATE: " << StateStr[current_sequencer_state_]);
     // Respond if input was wrong
-    publishResponse(missionID_, int(msg->request), false, false);
+    publishResponse(current_mission_ID_, int(msg->request), false, false);
   }
 };
 
@@ -489,15 +530,16 @@ void MissionSequencer::cbWaypointFilename(const std_msgs::String::ConstPtr& msg)
   }
 }
 
-void MissionSequencer::publishResponse(int id, int request, bool response, bool completed)
+void MissionSequencer::publishResponse(const uint8_t& id, const uint8_t& request, const bool& response,
+                                       const bool& completed) const
 {
   mission_sequencer::MissionResponse msg;
 
-  // TODO: add request topics part
+  // TODO(cbo): add request topics part
   msg.header = std_msgs::Header();
   msg.header.stamp = ros::Time::now();
-  msg.request.id = uint8_t(id);
-  msg.request.request = uint8_t(request);
+  msg.request.id = id;
+  msg.request.request = request;
   msg.response = response;
   msg.completed = completed;
 
@@ -545,34 +587,34 @@ void MissionSequencer::logic(void)
 {
   switch (current_sequencer_state_)
   {
-    case IDLE:
+    case SequencerState::IDLE:
       performIdle();
       return;
 
-    case PREARM:
+    case SequencerState::PREARM:
       if (b_do_verbose_)
       {
         ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::PREARM");
       }
       return;
 
-    case ARM:
+    case SequencerState::ARM:
       performArming();
       break;
 
-    case MISSION:
+    case SequencerState::MISSION:
       performMission();
       break;
 
-    case LAND:
+    case SequencerState::LAND:
       performLand();
       break;
 
-    case DISARM:
+    case SequencerState::DISARM:
       performDisarming();
       break;
 
-    case HOLD:
+    case SequencerState::HOLD:
       performHold();
       break;
   }
@@ -580,7 +622,7 @@ void MissionSequencer::logic(void)
 
 void MissionSequencer::publishPoseSetpoint(void)
 {
-  if (currentVehicleState_.connected && b_pose_is_valid_)
+  if (current_vehicle_state_.connected && b_pose_is_valid_)
   {
     setpoint_vehicle_pose_.header = std_msgs::Header();
     setpoint_vehicle_pose_.header.stamp = ros::Time::now();
@@ -602,9 +644,12 @@ void MissionSequencer::performArming()
   {
     ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::ARM");
   }
-  if (!currentVehicleState_.armed)
+
+  // check if we are already armed
+  if (!current_vehicle_state_.armed)
   {
-    if (currentVehicleState_.mode != "OFFBOARD" && (ros::Time::now().toSec() - offboardRequestTime_.toSec() > 2.5))
+    // arm the vehicle
+    if (current_vehicle_state_.mode != "OFFBOARD" && (ros::Time::now().toSec() - offboardRequestTime_.toSec() > 2.5))
     {
       if (srv_mavros_set_mode_.call(offboardMode_) && offboardMode_.response.mode_sent)
       {
@@ -614,7 +659,7 @@ void MissionSequencer::performArming()
     }
     else
     {
-      if (!currentVehicleState_.armed && (ros::Time::now().toSec() - armRequestTime_.toSec() > 2.5))
+      if (!current_vehicle_state_.armed && (ros::Time::now().toSec() - armRequestTime_.toSec() > 2.5))
       {
         if (srv_mavros_arm_.call(armCmd_) && armCmd_.response.success)
         {
@@ -626,17 +671,33 @@ void MissionSequencer::performArming()
   }
   else
   {
-    ROS_INFO("Starting Mission");
-    ROS_INFO("Taking off");
-    // Publish response of start
-    current_sequencer_state_ = MISSION;
-    reachedWaypoint_ = false;
-    b_is_landed_ = true;
+    if (b_do_auto_state_change_)
+    {
+      ROS_INFO("Starting Mission");
+      ROS_INFO("Taking off");
+      // Publish response of start
+      current_sequencer_state_ = SequencerState::MISSION;
+      b_wp_is_reached_ = false;
+      b_is_landed_ = true;
+    }
   }
 }
 
 void MissionSequencer::performTakeoff()
 {
+  ROS_DEBUG_STREAM_THROTTLE(dbg_throttle_rate_, "* SequencerState::TAKEOFF");
+
+  // check for takeoff type
+  if (sequencer_params_.takeoff_type_ == TakeoffType::POSITION)
+  {
+    // check if takeoff position has been reached
+    if (checkWaypoint(setpoint_takeoff_pose_))
+    {
+      // setpoint reached --> go into hover mode
+      ROS_INFO_STREAM("==> TAKEOFF completed");
+      current_sequencer_state_ = SequencerState::HOVER;
+    }
+  }
 }
 
 void MissionSequencer::performMission()
@@ -644,39 +705,17 @@ void MissionSequencer::performMission()
   // check if we still have waypoints in the list
   if (waypointList_.size() > 0)
   {
-    double differencePosition;
-    double differenceYaw;
-    geometry_msgs::PoseStamped currentWaypoint = waypointToPoseStamped(waypointList_[0]);
-    setpoint_vehicle_pose_ = currentWaypoint;
-
-    double differenceSquared = pow(abs(current_vehicle_pose_.pose.position.x - currentWaypoint.pose.position.x), 2) +
-                               pow(abs(current_vehicle_pose_.pose.position.y - currentWaypoint.pose.position.y), 2) +
-                               pow(abs(current_vehicle_pose_.pose.position.z - currentWaypoint.pose.position.z), 2);
-    differencePosition = sqrt(differenceSquared);
-    // std::cout << "Pos: " << differencePosition << std::endl;
-
-    differenceYaw = std::abs(
-        2.0 *
-        double(tf2::Quaternion(current_vehicle_pose_.pose.orientation.x, current_vehicle_pose_.pose.orientation.y,
-                               current_vehicle_pose_.pose.orientation.z, current_vehicle_pose_.pose.orientation.w)
-                   .angle(tf2::Quaternion(currentWaypoint.pose.orientation.x, currentWaypoint.pose.orientation.y,
-                                          currentWaypoint.pose.orientation.z, currentWaypoint.pose.orientation.w))));
-    differenceYaw = std::fmod(differenceYaw, 2 * M_PI);
-    if (differenceYaw > M_PI)
+    // check if waypoint has been reached
+    if (!b_wp_is_reached_ && checkWaypoint(waypointToPoseStamped(waypointList_[0])))
     {
-      differenceYaw -= 2 * M_PI;
+      // set waypoint reached and reset timer
+      b_wp_is_reached_ = true;
+      time_last_wp_reached_ = ros::Time::now();
     }
 
-    // std::cout << "Yaw: " << differenceYaw << std::endl;
-    if (!reachedWaypoint_ && differencePosition < thresholdPosition_ && std::abs(differenceYaw) < thresholdYaw_)
-    {
-      ROS_INFO_STREAM("Reached Waypoint: x = " << waypointList_[0].x << ", y = " << waypointList_[0].y
-                                               << ", z = " << waypointList_[0].z << ", yaw = " << waypointList_[0].yaw);
-      reachedWaypoint_ = true;
-      reachedWaypointTime_ = ros::Time::now();
-    }
-
-    if (reachedWaypoint_ && (ros::Time::now().toSec() - reachedWaypointTime_.toSec()) > waypointList_[0].holdtime)
+    /// \todo maybe automatically go to hover here, and continue if time has been exceeded
+    // check if holdtime was exceeded
+    if (b_wp_is_reached_ && (ros::Time::now().toSec() - time_last_wp_reached_.toSec()) > waypointList_[0].holdtime)
     {
       ROS_INFO_STREAM("Waited for: " << waypointList_[0].holdtime << " Seconds");
       waypointList_.erase(waypointList_.begin());
@@ -684,7 +723,7 @@ void MissionSequencer::performMission()
       if (waypointList_.size() != 0)
       {
         setpoint_vehicle_pose_ = waypointToPoseStamped(waypointList_[0]);
-        reachedWaypoint_ = false;
+        b_wp_is_reached_ = false;
       }
     }
   }
@@ -696,10 +735,10 @@ void MissionSequencer::performMission()
       if (landCmd_.response.success)
       {
         ROS_INFO("Landing");
-        current_sequencer_state_ = LAND;
+        current_sequencer_state_ = SequencerState::LAND;
 
         // Respond that mission succefully finished
-        publishResponse(missionID_, mission_sequencer::MissionRequest::UNDEF, false, true);
+        publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::UNDEF, false, true);
       }
     }
   }
@@ -715,11 +754,11 @@ void MissionSequencer::performHover()
 }
 void MissionSequencer::performLand()
 {
-  if (currentExtendedVehicleState_.landed_state == currentExtendedVehicleState_.LANDED_STATE_ON_GROUND)
+  if (current_vehicle_ext_state_.landed_state == current_vehicle_ext_state_.LANDED_STATE_ON_GROUND)
   {
     b_is_landed_ = true;
 
-    if (!currentVehicleState_.armed)
+    if (!current_vehicle_state_.armed)
     {
       if (b_do_verbose_)
       {
@@ -746,7 +785,7 @@ void MissionSequencer::performHold()
 void MissionSequencer::performDisarming()
 {
   bool is_disarmed = true;
-  if (currentVehicleState_.armed)
+  if (current_vehicle_state_.armed)
   {
     is_disarmed = false;
     if (srv_mavros_disarm_.call(disarmCmd_))
@@ -806,6 +845,92 @@ void MissionSequencer::performDisarming()
 
 void MissionSequencer::performAbort()
 {
+}
+
+bool MissionSequencer::checkWaypoint(const geometry_msgs::PoseStamped& current_waypoint)
+{
+  // set the current setpoint
+  setpoint_vehicle_pose_ = current_waypoint;
+
+  double diff_position, diff_yaw;
+  // calculate position difference
+  double diff_squared =
+      std::pow(std::fabs(current_vehicle_pose_.pose.position.x - current_waypoint.pose.position.x), 2) +
+      std::pow(std::fabs(current_vehicle_pose_.pose.position.y - current_waypoint.pose.position.y), 2) +
+      std::pow(std::fabs(current_vehicle_pose_.pose.position.z - current_waypoint.pose.position.z), 2);
+  diff_position = std::sqrt(diff_squared);
+  ROS_DEBUG_STREAM("-   diff_position: " << diff_position);
+
+  // claculate yaw difference
+  diff_yaw = std::fabs(
+      2.0 *
+      double(tf2::Quaternion(current_vehicle_pose_.pose.orientation.x, current_vehicle_pose_.pose.orientation.y,
+                             current_vehicle_pose_.pose.orientation.z, current_vehicle_pose_.pose.orientation.w)
+                 .angle(tf2::Quaternion(current_waypoint.pose.orientation.x, current_waypoint.pose.orientation.y,
+                                        current_waypoint.pose.orientation.z, current_waypoint.pose.orientation.w))));
+  diff_yaw = std::fmod(diff_yaw, 2 * M_PI);
+  if (diff_yaw > M_PI)
+  {
+    diff_yaw -= 2 * M_PI;
+  }
+  ROS_DEBUG_STREAM("-   diff_yaw:      " << diff_yaw);
+
+  // check if waypoint has been reached
+
+  if (diff_position < sequencer_params_.threshold_position_ && std::fabs(diff_yaw) < sequencer_params_.threshold_yaw_)
+  {
+    ROS_INFO_STREAM("Reached Waypoint: x = " << waypointList_[0].x << ", y = " << waypointList_[0].y
+                                             << ", z = " << waypointList_[0].z << ", yaw = " << waypointList_[0].yaw);
+    return true;
+  }
+
+  // waypoint not reached --> return fals
+  return false;
+}
+
+bool MissionSequencer::checkStateChange(const SequencerState new_state) const
+{
+  switch (current_sequencer_state_)
+  {
+    case SequencerState::ARM:
+      // ARM -> request(TAKEOFF) --> TAKEOFF
+      // ARM -> request(DISARM) --> DISARM
+      if (new_state == SequencerState::TAKEOFF)
+        return true;
+      else if (new_state == SequencerState::DISARM)
+        return true;
+      break;
+
+    case SequencerState::MISSION:
+      // MISSION -> request(HOLD) --> HOLD
+      // MISSION -> request(LAND) --> LAND
+      // MISSION -> request(HOVER) --> HOVER
+      if (new_state == SequencerState::HOLD)
+        return true;
+      else if (new_state == SequencerState::LAND)
+        return true;
+      else if (new_state == SequencerState::HOVER)
+        return true;
+      break;
+
+    case SequencerState::HOLD:
+      // HOLD -> request(RESUME) -> prevstate in MISSION, TAKEOFF, LAND, HOVER --> PREV_STATE
+      // HOLD -> request(LAND) -> LAND
+      if (new_state == SequencerState::LAND)
+        return true;
+      else if (new_state == SequencerState::MISSION)
+        return true;
+      else if (new_state == SequencerState::HOVER)
+        return true;
+      else if (new_state == SequencerState::TAKEOFF)
+        return true;
+      break;
+  }
+
+  // state change was not approved
+  ROS_ERROR_STREAM("=> No known state transition from " << current_sequencer_state_ << " to " << new_state);
+  ROS_ERROR_STREAM("   Staying in " << current_sequencer_state_);
+  return false;
 }
 
 }  // namespace mission_sequencer
