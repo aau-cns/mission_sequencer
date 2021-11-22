@@ -37,7 +37,9 @@ struct MissionSequencerOptions
   // SEQUENCER OPTIONS ========================================================
 
   bool b_do_automatically_land_{ false };
+  bool b_do_automatically_disarm_{ false };
   bool b_wp_are_relative_{ false };
+  bool b_wp_from_file_{ false };
   bool b_do_verbose{ false };
 
   // ==========================================================================

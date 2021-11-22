@@ -12,6 +12,8 @@
 
 #include "mission_sequencer.hpp"
 
+#include "utils/message_conversion.hpp"
+
 namespace mission_sequencer
 {
 double warp_to_pi(double const angle_rad)
@@ -93,6 +95,7 @@ MissionSequencer::MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh)
   sub_vehicle_pose_ = nh_.subscribe("mavros/local_position/pose", 10, &MissionSequencer::cbPose, this);
   sub_ms_request_ = nh_.subscribe("autonomy/request", 10, &MissionSequencer::cbMSRequest, this);
   sub_waypoint_file_name_ = pnh_.subscribe("waypoint_filename", 10, &MissionSequencer::cbWaypointFilename, this);
+  sub_waypoint_list_ = pnh_.subscribe("waypoint_list", 10, &MissionSequencer::cbWaypointList, this);
 
   // Publishers (relative to node's namespace)
   pub_pose_setpoint_ = nh_.advertise<geometry_msgs::PoseStamped>("mavros/setpoint_position/local", 10);
@@ -243,24 +246,16 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
 {
   bool b_wrong_input = false;
 
-  // Get mission id
-  if (current_mission_ID_ != int(msg->id))
+  // check mission id
+  if (!checkMissionID(msg->id, msg->request))
   {
-    if (int(msg->request) == mission_sequencer::MissionRequest::READ &&
-        (current_sequencer_state_ == IDLE || current_sequencer_state_ == PREARM))
-    {
-      current_sequencer_state_ = IDLE;
-      current_mission_ID_ = int(msg->id);
-    }
-    else
-    {
-      ROS_INFO_STREAM("WRONG MISSION ID FOR CURRENT STATE: " << StateStr[current_sequencer_state_]
-                                                             << "; Local mission ID:" << current_mission_ID_
-                                                             << " msg ID: " << int(msg->id));
-      // Respond if input was wrong
-      publishResponse(current_mission_ID_, int(msg->request), false, false);
-      return;
-    }
+    // WRONG ID
+    // check if the request is to read mission files
+    ROS_INFO_STREAM("WRONG MISSION ID FOR CURRENT STATE: " << current_sequencer_state_ << "; Local mission ID:"
+                                                           << current_mission_ID_ << " msg ID: " << int(msg->id));
+    // Respond if input was wrong
+    publishResponse(current_mission_ID_, msg->request, false, false);
+    return;
   }
 
   // main request state machine
@@ -358,9 +353,10 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
 
         // set holding position
         setpoint_vehicle_pose_ = current_vehicle_pose_;
-        ROS_INFO_STREAM("Holding Position: x = " << setpoint_vehicle_pose_.pose.position.x
-                                                 << ", y = " << setpoint_vehicle_pose_.pose.position.y
-                                                 << ", z = " << setpoint_vehicle_pose_.pose.position.z);
+        ROS_INFO_STREAM("Hold Position: "
+                        << "  x = " << setpoint_vehicle_pose_.pose.position.x
+                        << ", y = " << setpoint_vehicle_pose_.pose.position.y
+                        << ", z = " << setpoint_vehicle_pose_.pose.position.z);
 
         // transition to new state
         current_sequencer_state_ = SequencerState::HOLD;
@@ -370,10 +366,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       }
       else
       {
-        if (b_do_verbose_)
-        {
-          ROS_WARN_STREAM("* amaze_mission_sequencer::request::HOLD - failed! Not in MISSION!");
-        }
+        ROS_WARN_STREAM("* amaze_mission_sequencer::request::HOLD - failed! Not in MISSION!");
         b_wrong_input = true;
       }
       break;
@@ -430,6 +423,18 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       ROS_DEBUG_STREAM("* amaze_mission_sequencer::request::HOVER...");
       if (checkStateChange(SequencerState::HOVER))
       {
+        // set the hover pose to the current pose
+        setpoint_vehicle_pose_ = current_vehicle_pose_;
+        ROS_INFO_STREAM("Hover Position: "
+                        << "  x = " << setpoint_vehicle_pose_.pose.position.x
+                        << ", y = " << setpoint_vehicle_pose_.pose.position.y
+                        << ", z = " << setpoint_vehicle_pose_.pose.position.z);
+
+        // transition to new state
+        current_sequencer_state_ = SequencerState::HOVER;
+
+        // respond to request --> completed immediatly
+        publishResponse(current_mission_ID_, msg->request, true, true);
       }
       break;
     }
@@ -476,10 +481,10 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
     }
 
     case mission_sequencer::MissionRequest::READ: {
-      if (b_do_verbose_)
-      {
-        ROS_INFO_STREAM("* amaze_mission_sequencer::request::READ...");
-      }
+      ROS_DEBUG_STREAM("* amaze_mission_sequencer::request::READ...");
+      // transition to IDLE regardless of current state
+      /// \todo TODO(scm): perform this also in PREARM state and create transition function
+
       if (current_sequencer_state_ == SequencerState::IDLE)
       {
         try
@@ -519,6 +524,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
 
     default:
       ROS_ERROR("REQUEST NOT DEFINED");
+      b_wrong_input = true;
       break;
   }
 
@@ -539,6 +545,45 @@ void MissionSequencer::cbWaypointFilename(const std_msgs::String::ConstPtr& msg)
   {
     ROS_INFO_STREAM("Received new waypoint_filename: " << fn << "; accepted:" << res);
   }
+}
+
+void MissionSequencer::cbWaypointList(const mission_sequencer::MissionWaypointArrayConstPtr& msg)
+{
+  std::vector<ParseWaypoint::Waypoint> new_waypoints = MSMsgConv::WaypointArray2WaypointList(msg->waypoints);
+  if (new_waypoints.empty())
+  {
+    ROS_ERROR_STREAM("=> cbWaypointList: Could not add new waypoints as list is empty.");
+    return;
+  }
+
+  // perform action as requested
+  if (msg->action == mission_sequencer::MissionWaypointArray::CLEAR)
+  {
+    // clear waypoint list, then append
+    waypointList_.clear();
+    waypointList_ = std::move(new_waypoints);
+
+    // reset WP reached
+    b_wp_is_reached_ = false;
+  }
+  else
+  {
+    // otherwise the wp are added to list (depending on append or insert
+    std::vector<ParseWaypoint::Waypoint>::iterator it_cur_wp = waypointList_.end();
+    if (msg->action == mission_sequencer::MissionWaypointArray::INSERT)
+    {
+      ROS_WARN_STREAM("=> cbWaypointList: INSERT is not yet implemented, APPENDING waypoints");
+      // todo modify iterator accordingly here
+    }
+
+    // "insert" vector
+    waypointList_.insert(it_cur_wp, new_waypoints.begin(), new_waypoints.end());
+  }
+
+  // debug output
+  ROS_DEBUG_STREAM("=> cbWaypointList:\n"
+                   << "\tAdded " << new_waypoints.size() << " WPs\n"
+                   << "\tHave  " << waypointList_.size() << " WPs");
 }
 
 void MissionSequencer::publishResponse(const uint8_t& id, const uint8_t& request, const bool& response,
@@ -611,6 +656,14 @@ void MissionSequencer::logic(void)
 
     case SequencerState::ARM:
       performArming();
+      break;
+
+    case SequencerState::TAKEOFF:
+      performTakeoff();
+      break;
+
+    case SequencerState::HOVER:
+      performHover();
       break;
 
     case SequencerState::MISSION:
@@ -1028,6 +1081,26 @@ bool MissionSequencer::executeLanding()
   }
 
   return false;
+}
+
+bool MissionSequencer::checkMissionID(const uint8_t& mission_id, const uint8_t& request_id) const
+{
+  // check mission ID
+  if (current_mission_ID_ != mission_id)
+  {
+    // WRONG ID
+    // check if request was to read mission files (only accepted in IDLE or PREARM states
+    if (request_id == mission_sequencer::MissionRequest::READ &&
+        (current_sequencer_state_ == SequencerState::IDLE || current_sequencer_state_ == SequencerState::PREARM))
+    {
+      return true;
+    }
+
+    return false;
+  }
+
+  // same ID
+  return true;
 }
 
 }  // namespace mission_sequencer

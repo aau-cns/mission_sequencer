@@ -91,6 +91,7 @@ private:
   ros::Subscriber sub_vehicle_pose_;            //!< ROS subscriber for current vehicle pose
   ros::Subscriber sub_ms_request_;  //!< ROS subscirber for mission sequencer request (ARM, TAKEOFF, MISSION, LAND, etc)
   ros::Subscriber sub_waypoint_file_name_;  //!< ROS subscriber for waypoint file name
+  ros::Subscriber sub_waypoint_list_;   //!< ROS subscriber for waypoint list
 
   // ROS Service Clients
   ros::ServiceClient srv_mavros_arm_;       //!< ROS service client to the 'arm' mavros interface
@@ -123,6 +124,20 @@ private:
 
   void cbMSRequest(const mission_sequencer::MissionRequest::ConstPtr& msg);
   void cbWaypointFilename(const std_msgs::String::ConstPtr& msg);
+
+  ///
+  /// \brief cbWaypointList ROS topic callback for a list of waypoitns
+  /// \param msg array of waypoints in the 'global' navigation frame
+  ///
+  /// This either
+  /// 1. replaces,
+  /// 2. appends, or
+  /// 3. inserts (NOT YET IMPLEMENTED)
+  /// the given waypoints to the current list of waypoints.
+  ///
+  /// \todo TODO(scm): implement the insert functionality
+  ///
+  void cbWaypointList(const mission_sequencer::MissionWaypointArrayConstPtr& msg);
 
   ///
   /// \brief publishResponse publishes the reponse to a mission request onto the ROS network
@@ -194,11 +209,16 @@ private:
   mavros_msgs::State current_vehicle_state_;              //!< determines the current vehicle mavros state
   mavros_msgs::ExtendedState current_vehicle_ext_state_;  //!< determines the current vehcile extended mavros state
 
-  uint8_t current_mission_ID_;
+  uint8_t current_mission_ID_;  //!< determines the ID of the current mission (used to safeguard that requests are
+                                //!< acutally made for the correct mission)
 
   // communication variables
 private:
   MavrosCommands mavros_cmds_;
+  ros::Time armRequestTime_;
+  ros::Time disarmRequestTime_;
+  ros::Time offboardRequestTime_;
+
   // REST - WIP
 private:
   int requestNumber_;
@@ -206,14 +226,10 @@ private:
   std::vector<ParseWaypoint::Waypoint> waypointList_;
   ros::Time time_last_wp_reached_;
 
-
   mavros_msgs::SetMode offboardMode_;
   mavros_msgs::CommandBool armCmd_;
   mavros_msgs::CommandLong disarmCmd_;
   mavros_msgs::CommandTOL landCmd_;
-  ros::Time armRequestTime_;
-  ros::Time disarmRequestTime_;
-  ros::Time offboardRequestTime_;
 
   double thresholdPosition_;
   double thresholdYaw_;
@@ -229,9 +245,26 @@ private:
   bool getFilenames();
   bool setFilename(std::string const waypoint_fn);
 
+  // METHODS TO CHECK TRANSITIONS, IDS, STATES, ETC.
+private:
   bool checkWaypoint(const geometry_msgs::PoseStamped& current_waypoint);
   bool checkStateChange(const SequencerState new_state) const;
 
+  ///
+  /// \brief checkMissionID checks if the mission ID is suitable with the current mission ID
+  /// \param mission_id
+  /// \param request_id
+  /// \return
+  ///
+  /// The mission_id is deemed suitable if it is exactly the same as the current_mission_ID_ or if the
+  /// current_sequencer_state is either IDLE or PREARM given that the request_id corresponds to a READ request.
+  ///
+  bool checkMissionID(const uint8_t& mission_id, const uint8_t& request_id) const;
+
+  ///
+  /// \brief executeLanding executes any landing by sending the command to the mavros interface
+  /// \return true, if the command has been successfully sent to mavros
+  ///
   bool executeLanding();
 
 public:

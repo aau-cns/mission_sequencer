@@ -1,7 +1,13 @@
-/*
- * Alessandro Fornasier (CNS)
- * alessandro.fornasier@aau.at
- */
+// Copyright (C) 2021 Alessandro Fornasier, Martin Scheiber, Control of Networked Systems, University of Klagenfurt,
+// Austria.
+//
+// All rights reserved.
+//
+// This software is licensed under the terms of the BSD-2-Clause-License with
+// no commercial use allowed, the full terms of which are made available
+// in the LICENSE file. No license in patents is granted.
+//
+// You can contact the authors at <alessandro.fornasier@aau.at> and <martin.scheiber@aau.at>
 
 #ifndef PARSEWAYPOINT_HPP
 #define PARSEWAYPOINT_HPP
@@ -46,6 +52,11 @@ public:
     double z;
     double yaw;
     double holdtime;
+
+    Waypoint(){};
+
+    Waypoint(double _x, double _y, double _z, double _yaw, double _holdtime)
+      : x(_x), y(_y), z(_z), yaw(_yaw), holdtime(_holdtime){};
   };
 
   /**
