@@ -11,6 +11,9 @@
 #ifndef MS_SEQUENCER_TYPES_HPP_
 #define MS_SEQUENCER_TYPES_HPP_
 
+#define RAD_TO_DEG (180.0 / M_PI)
+#define DEG_TO_RAD (M_PI / 180.0)
+
 #include <iostream>
 
 namespace mission_sequencer
@@ -65,6 +68,8 @@ static std::ostream& operator<<(std::ostream& os, SequencerState state)
       return os << "DISARM";
       // omit default case to trigger compiler warning for missing cases
   }
+
+  return os;
 }
 
 

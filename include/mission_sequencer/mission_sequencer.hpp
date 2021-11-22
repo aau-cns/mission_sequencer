@@ -41,16 +41,19 @@
 #include "types/sequencer_options.hpp"
 #include "types/sequencer_types.hpp"
 
-#define RAD_TO_DEG (180.0 / M_PI)
-#define DEG_TO_RAD (M_PI / 180.0)
+//#define RAD_TO_DEG (180.0 / M_PI)
+//#define DEG_TO_RAD (M_PI / 180.0)
 
 namespace mission_sequencer
 {
-static const char* StateStr[] = { "IDLE", "ARM", "MISSION", "HOLD", "LAND", "DISARM" };
 
 class MissionSequencer
 {
 private:
+  ///
+  /// \brief The MavrosCommands struct implements a hardcoded structure to easily send ARM, DISARM, LAND and MODE
+  /// commands to mavros
+  ///
   struct MavrosCommands
   {
     mavros_msgs::SetMode offboard_mode_;
@@ -58,6 +61,18 @@ private:
     mavros_msgs::CommandLong disarm_cmd_;
     mavros_msgs::CommandTOL land_cmd_;
 
+    ros::Time time_arm_request;
+    ros::Time time_disarm_request;
+    ros::Time time_offboard_request;
+
+    ///
+    /// \brief MavrosCommands default constructor setting the default values for all commands.
+    ///
+    /// \see https://mavlink.io/en/messages/common.html#COMMAND_LONG
+    /// \see https://mavlink.io/en/messages/common.html#MAV_CMD_COMPONENT_ARM_DISARM
+    ///
+    /// \author ALF
+    ///
     MavrosCommands()
     {
       // setup disarm command
@@ -71,6 +86,24 @@ private:
       disarm_cmd_.request.param5 = 0.0;
       disarm_cmd_.request.param6 = 0.0;
       disarm_cmd_.request.param7 = 0.0;
+
+      // setup arm command
+      arm_cmd_.request.value = true;
+
+      // setup land command
+      land_cmd_.request.yaw = 0;
+      land_cmd_.request.latitude = 0;
+      land_cmd_.request.longitude = 0;
+      land_cmd_.request.altitude = 0;
+
+      // setup offboard mode
+      offboard_mode_.request.custom_mode = "OFFBOARD";
+
+      // set times to current ros time
+      ros::Time request_time = ros::Time::now();
+      time_arm_request = request_time;
+      time_disarm_request = request_time;
+      time_offboard_request = request_time;
     }
   };
 
@@ -91,7 +124,7 @@ private:
   ros::Subscriber sub_vehicle_pose_;            //!< ROS subscriber for current vehicle pose
   ros::Subscriber sub_ms_request_;  //!< ROS subscirber for mission sequencer request (ARM, TAKEOFF, MISSION, LAND, etc)
   ros::Subscriber sub_waypoint_file_name_;  //!< ROS subscriber for waypoint file name
-  ros::Subscriber sub_waypoint_list_;   //!< ROS subscriber for waypoint list
+  ros::Subscriber sub_waypoint_list_;       //!< ROS subscriber for waypoint list
 
   // ROS Service Clients
   ros::ServiceClient srv_mavros_arm_;       //!< ROS service client to the 'arm' mavros interface
@@ -211,25 +244,15 @@ private:
 
   uint8_t current_mission_ID_;  //!< determines the ID of the current mission (used to safeguard that requests are
                                 //!< acutally made for the correct mission)
+  std::vector<ParseWaypoint::Waypoint> waypoint_list_;  //!< list of waypoints currently in use
+  ros::Time time_last_wp_reached_;                      //!< time since last waypoint was reached
 
   // communication variables
 private:
   MavrosCommands mavros_cmds_;
-  ros::Time armRequestTime_;
-  ros::Time disarmRequestTime_;
-  ros::Time offboardRequestTime_;
 
   // REST - WIP
 private:
-  int requestNumber_;
-
-  std::vector<ParseWaypoint::Waypoint> waypointList_;
-  ros::Time time_last_wp_reached_;
-
-  mavros_msgs::SetMode offboardMode_;
-  mavros_msgs::CommandBool armCmd_;
-  mavros_msgs::CommandLong disarmCmd_;
-  mavros_msgs::CommandTOL landCmd_;
 
   double thresholdPosition_;
   double thresholdYaw_;

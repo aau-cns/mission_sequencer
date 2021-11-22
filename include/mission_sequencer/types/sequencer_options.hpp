@@ -33,17 +33,35 @@ struct MissionSequencerOptions
   /// the interpretation depends on the TakeoffType chosen in takeoff_type_
   double takeoff_z_{ 1.0 };
 
+  /// path to file where potential waypoints are stored
+  /// this will only be used if b_wp_from_file_ is set to true
+  std::string filename_wps_{ "" };
+
+  void printNavigation()
+  {
+  }
+
   // ==========================================================================
   // SEQUENCER OPTIONS ========================================================
 
+  bool b_do_autosequence_{ false };
   bool b_do_automatically_land_{ false };
   bool b_do_automatically_disarm_{ false };
   bool b_wp_are_relative_{ false };
   bool b_wp_from_file_{ false };
   bool b_do_verbose{ false };
 
+  void printSequencer()
+  {
+  }
+
   // ==========================================================================
   // ROS OPTIONS ==============================================================
+
+  std::string srv_cmd_arming_{ "/mavros/cmd/arming" };
+  std::string srv_cmd_command_{ "/mavros/cmd/command" };
+  std::string srv_cmd_land_{ "/mavros/cmd/land" };
+  std::string srv_cmd_set_mode_{ "/mavros/set_mode" };
 
 };  // class MissionSequencerOptions
 }  // namespace mission_sequencer

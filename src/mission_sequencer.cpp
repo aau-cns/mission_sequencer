@@ -13,6 +13,7 @@
 #include "mission_sequencer.hpp"
 
 #include "utils/message_conversion.hpp"
+#include "utils/parser_ros.hpp"
 
 namespace mission_sequencer
 {
@@ -32,63 +33,40 @@ double warp_to_pi(double const angle_rad)
 }
 
 MissionSequencer::MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh)
-  : nh_(nh), pnh_(pnh), current_sequencer_state_{ SequencerState::IDLE }
+  : nh_(nh)
+  , pnh_(pnh)
+  , current_sequencer_state_{ SequencerState::IDLE }
+  , previous_sequencer_state_{ SequencerState::IDLE }
 {
+  // setup parameters
+  sequencer_params_ = parse_ros_nodehandle(nh_);
+
+  // setup navigation variables
   current_vehicle_state_ = mavros_msgs::State();
   current_vehicle_ext_state_ = mavros_msgs::ExtendedState();
   current_vehicle_pose_ = geometry_msgs::PoseStamped();
-
   starting_vehicle_pose_ = geometry_msgs::PoseStamped();
-
   setpoint_vehicle_pose_ = geometry_msgs::PoseStamped();
 
-  current_mission_ID_ = 0;
-  requestNumber_ = 0;
-
-  waypointList_ = std::vector<ParseWaypoint::Waypoint>(0);
+  waypoint_list_ = std::vector<ParseWaypoint::Waypoint>(0);
   time_last_wp_reached_ = ros::Time::now();
+
+  // TODO(scm): maybe make the mission_id uninitialized just in case
+  current_mission_ID_ = 0;
+
+  // setup communication variables
+  mavros_cmds_ = MissionSequencer::MavrosCommands();
 
   filenames_ = std::vector<std::string>(0);
 
-  offboardMode_.request.custom_mode = "OFFBOARD";
-  armCmd_.request.value = true;
-  landCmd_.request.yaw = 0;
-  landCmd_.request.latitude = 0;
-  landCmd_.request.longitude = 0;
-  landCmd_.request.altitude = 0;
-  armRequestTime_ = ros::Time::now();
-  offboardRequestTime_ = ros::Time::now();
-
-  b_wp_are_relativ_ = true;
-
-  b_is_landed_ = false;
-
-  // ros::NodeHandle private_nh("~");
-  // Load Parameters (privately)
-  if (!pnh_.getParam("threshold_position", thresholdPosition_))
-  {
-    ROS_WARN("Could not retrieve threshold for position, setting to 0.3m");
-    thresholdPosition_ = 0.3;
-  }
-  if (!pnh_.getParam("threshold_yaw", thresholdYaw_))
-  {
-    ROS_WARN("Could not retrieve threshold for yaw, setting to 0.1 rad");
-    thresholdYaw_ = 0.1;
-  }
-  std::string waypoint_fn;
-  pnh_.param<std::string>("waypoint_filename", waypoint_fn, "");
-  pnh_.param<bool>("automatic_landing", b_do_automatically_land_, false);
-  pnh_.param<bool>("verbose", b_do_verbose_, false);
-  pnh_.param<bool>("relative_waypoints", b_wp_are_relativ_, true);
-
-  // Subscribers
+  // setup ROS subscribers
   sub_vehicle_state_ = nh.subscribe("/mavros/state", 10, &MissionSequencer::cbVehicleState, this);
   sub_extended_vehicle_state_ =
       nh.subscribe("/mavros/extended_state", 10, &MissionSequencer::cbExtendedVehicleState, this);
   sub_vehicle_pose_ = nh.subscribe("/mavros/local_position/pose", 10, &MissionSequencer::cbPose, this);
   sub_ms_request_ = nh.subscribe("/autonomy/request", 10, &MissionSequencer::cbMSRequest, this);
 
-  // Subscribers (relative to node's namespace)
+  // setup ROS subscribers (relative to node's namespace)
   sub_vehicle_state_ = nh_.subscribe("mavros/state", 10, &MissionSequencer::cbVehicleState, this);
   sub_extended_vehicle_state_ =
       nh_.subscribe("mavros/extended_state", 10, &MissionSequencer::cbExtendedVehicleState, this);
@@ -97,26 +75,19 @@ MissionSequencer::MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh)
   sub_waypoint_file_name_ = pnh_.subscribe("waypoint_filename", 10, &MissionSequencer::cbWaypointFilename, this);
   sub_waypoint_list_ = pnh_.subscribe("waypoint_list", 10, &MissionSequencer::cbWaypointList, this);
 
-  // Publishers (relative to node's namespace)
+  // setup ROS publishers (relative to node's namespace)
   pub_pose_setpoint_ = nh_.advertise<geometry_msgs::PoseStamped>("mavros/setpoint_position/local", 10);
   pub_ms_response_ = nh_.advertise<mission_sequencer::MissionResponse>("autonomy/response", 10);
 
-  // Services (relative to node's namespace)
-  std::string service_mavros_cmd_arming;
-  pnh_.param<std::string>("mavros_cmd_arming_o", service_mavros_cmd_arming, "mavros/cmd/arming");
-  std::string service_mavros_cmd_command;
-  pnh_.param<std::string>("mavros_cmd_command_o", service_mavros_cmd_command, "mavros/cmd/command");
-  std::string service_mavros_cmd_land;
-  pnh_.param<std::string>("mavros_cmd_land_o", service_mavros_cmd_land, "mavros/cmd/land");
-  std::string service_mavros_set_mode;
-  pnh_.param<std::string>("mavros_set_mode_o", service_mavros_set_mode, "mavros/set_mode");
+  // setup ROS services (relative to node's namespace)
+  srv_mavros_arm_ = nh_.serviceClient<mavros_msgs::CommandBool>(sequencer_params_.srv_cmd_arming_);
+  srv_mavros_disarm_ = nh_.serviceClient<mavros_msgs::CommandLong>(sequencer_params_.srv_cmd_command_);
+  srv_mavros_land_ = nh_.serviceClient<mavros_msgs::CommandTOL>(sequencer_params_.srv_cmd_land_);
+  srv_mavros_set_mode_ = nh_.serviceClient<mavros_msgs::SetMode>(sequencer_params_.srv_cmd_set_mode_);
 
-  srv_mavros_arm_ = nh_.serviceClient<mavros_msgs::CommandBool>(service_mavros_cmd_arming);
-  srv_mavros_disarm_ = nh_.serviceClient<mavros_msgs::CommandLong>(service_mavros_cmd_command);
-  srv_mavros_land_ = nh_.serviceClient<mavros_msgs::CommandTOL>(service_mavros_cmd_land);
-  srv_mavros_set_mode_ = nh_.serviceClient<mavros_msgs::SetMode>(service_mavros_set_mode);
-
-  setFilename(waypoint_fn);
+  // set waypoints, if required
+  if (sequencer_params_.b_wp_from_file_)
+    setFilename(sequencer_params_.filename_wps_);
 };
 
 MissionSequencer::~MissionSequencer(){
@@ -171,8 +142,8 @@ void MissionSequencer::cbPose(const geometry_msgs::PoseStamped::ConstPtr& msg)
                                                        << " pos z=" << starting_vehicle_pose_.pose.position.z);
     }
 
-    landCmd_.request.yaw = startingYaw * RAD_TO_DEG;
-    landCmd_.request.altitude = starting_vehicle_pose_.pose.position.z;
+    mavros_cmds_.land_cmd_.request.yaw = startingYaw * RAD_TO_DEG;
+    mavros_cmds_.land_cmd_.request.altitude = starting_vehicle_pose_.pose.position.z;
 
     // set the current goal to the current pose
     setpoint_vehicle_pose_ = starting_vehicle_pose_;
@@ -238,8 +209,11 @@ bool MissionSequencer::setFilename(std::string const waypoint_fn)
     else
     {
       waypoint_fn_ = waypoint_fn;
+      return true;
     }
   }
+
+  return false;
 };
 
 void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::ConstPtr& msg)
@@ -292,9 +266,9 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
         //        }
 
         // Preparation for arming
-        armCmd_.request.value = true;
-        armRequestTime_ = ros::Time::now();
-        offboardRequestTime_ = ros::Time::now();
+        mavros_cmds_.arm_cmd_.request.value = true;  // QUESTION(scm); is this actually needed?
+        mavros_cmds_.time_arm_request = ros::Time::now();
+        mavros_cmds_.time_offboard_request = ros::Time::now();
         current_sequencer_state_ = SequencerState::ARM;
 
         // Respond to request
@@ -464,7 +438,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       if (checkStateChange(SequencerState::DISARM))
       {
         // Preparation for arming
-        disarmRequestTime_ = ros::Time::now();
+        mavros_cmds_.time_disarm_request = ros::Time::now();
 
         // transition to new state
         current_sequencer_state_ = SequencerState::DISARM;
@@ -560,8 +534,8 @@ void MissionSequencer::cbWaypointList(const mission_sequencer::MissionWaypointAr
   if (msg->action == mission_sequencer::MissionWaypointArray::CLEAR)
   {
     // clear waypoint list, then append
-    waypointList_.clear();
-    waypointList_ = std::move(new_waypoints);
+    waypoint_list_.clear();
+    waypoint_list_ = std::move(new_waypoints);
 
     // reset WP reached
     b_wp_is_reached_ = false;
@@ -569,7 +543,7 @@ void MissionSequencer::cbWaypointList(const mission_sequencer::MissionWaypointAr
   else
   {
     // otherwise the wp are added to list (depending on append or insert
-    std::vector<ParseWaypoint::Waypoint>::iterator it_cur_wp = waypointList_.end();
+    std::vector<ParseWaypoint::Waypoint>::iterator it_cur_wp = waypoint_list_.end();
     if (msg->action == mission_sequencer::MissionWaypointArray::INSERT)
     {
       ROS_WARN_STREAM("=> cbWaypointList: INSERT is not yet implemented, APPENDING waypoints");
@@ -577,13 +551,13 @@ void MissionSequencer::cbWaypointList(const mission_sequencer::MissionWaypointAr
     }
 
     // "insert" vector
-    waypointList_.insert(it_cur_wp, new_waypoints.begin(), new_waypoints.end());
+    waypoint_list_.insert(it_cur_wp, new_waypoints.begin(), new_waypoints.end());
   }
 
   // debug output
   ROS_DEBUG_STREAM("=> cbWaypointList:\n"
                    << "\tAdded " << new_waypoints.size() << " WPs\n"
-                   << "\tHave  " << waypointList_.size() << " WPs");
+                   << "\tHave  " << waypoint_list_.size() << " WPs");
 }
 
 void MissionSequencer::publishResponse(const uint8_t& id, const uint8_t& request, const bool& response,
@@ -696,40 +670,36 @@ void MissionSequencer::publishPoseSetpoint(void)
 
 void MissionSequencer::performIdle()
 {
-  if (b_do_verbose_)
-  {
-    ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::IDLE");
-  }
+  ROS_DEBUG_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::IDLE");
 }
 
 void MissionSequencer::performArming()
 {
-  if (b_do_verbose_)
-  {
-    ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::ARM");
-  }
+  ROS_DEBUG_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::ARM");
 
   // check if we are already armed
   if (!current_vehicle_state_.armed)
   {
-    // arm the vehicle
-    if (current_vehicle_state_.mode != "OFFBOARD" && (ros::Time::now().toSec() - offboardRequestTime_.toSec() > 2.5))
+    // check offboard mode
+    if (current_vehicle_state_.mode != "OFFBOARD" &&
+        (ros::Time::now().toSec() - mavros_cmds_.time_offboard_request.toSec() > 2.5))
     {
-      if (srv_mavros_set_mode_.call(offboardMode_) && offboardMode_.response.mode_sent)
+      if (srv_mavros_set_mode_.call(mavros_cmds_.offboard_mode_) && mavros_cmds_.offboard_mode_.response.mode_sent)
       {
         ROS_INFO("Offboard enabled");
       }
-      offboardRequestTime_ = ros::Time::now();
+      mavros_cmds_.time_offboard_request = ros::Time::now();
     }
     else
     {
-      if (!current_vehicle_state_.armed && (ros::Time::now().toSec() - armRequestTime_.toSec() > 2.5))
+      // check if we can arm
+      if (!current_vehicle_state_.armed && (ros::Time::now().toSec() - mavros_cmds_.time_arm_request.toSec() > 2.5))
       {
-        if (srv_mavros_arm_.call(armCmd_) && armCmd_.response.success)
+        if (srv_mavros_arm_.call(mavros_cmds_.arm_cmd_) && mavros_cmds_.arm_cmd_.response.success)
         {
           ROS_INFO("Vehicle armed");
         }
-        armRequestTime_ = ros::Time::now();
+        mavros_cmds_.time_arm_request = ros::Time::now();
       }
     }
   }
@@ -767,10 +737,10 @@ void MissionSequencer::performTakeoff()
 void MissionSequencer::performMission()
 {
   // check if we still have waypoints in the list
-  if (waypointList_.size() > 0)
+  if (waypoint_list_.size() > 0)
   {
     // check if waypoint has been reached
-    if (!b_wp_is_reached_ && checkWaypoint(waypointToPoseStamped(waypointList_[0])))
+    if (!b_wp_is_reached_ && checkWaypoint(waypointToPoseStamped(waypoint_list_[0])))
     {
       // set waypoint reached and reset timer
       b_wp_is_reached_ = true;
@@ -822,30 +792,30 @@ void MissionSequencer::performMission()
   //  if (b_do_verbose_)
   //  {
   ROS_DEBUG_STREAM_THROTTLE(dbg_throttle_rate_,
-                            "* currentFollowerState__::MISSION; waypoints left: " << waypointList_.size());
+                            "* currentFollowerState__::MISSION; waypoints left: " << waypoint_list_.size());
   //  }
 }
 
 void MissionSequencer::performHover()
 {
   // check size of waypoints list
-  if (!waypointList_.empty())
+  if (!waypoint_list_.empty())
   {
     bool b_transition_to_mission = true;
     // check if the goal is to hold at waypoint
     if (b_wp_is_reached_)
     {
       // holdtime check
-      if ((ros::Time::now().toSec() - time_last_wp_reached_.toSec()) > waypointList_[0].holdtime)
+      if ((ros::Time::now().toSec() - time_last_wp_reached_.toSec()) > waypoint_list_[0].holdtime)
       {
         // waypoint has been completed, delete from list
-        ROS_INFO_STREAM("Waited for: " << waypointList_[0].holdtime << " Seconds");
-        waypointList_.erase(waypointList_.begin());
+        ROS_INFO_STREAM("Waited for: " << waypoint_list_[0].holdtime << " Seconds");
+        waypoint_list_.erase(waypoint_list_.begin());
 
         // FIX(scm): make sure the list is not empty!!!
-        if (waypointList_.size() != 0)
+        if (waypoint_list_.size() != 0)
         {
-          setpoint_vehicle_pose_ = waypointToPoseStamped(waypointList_[0]);
+          setpoint_vehicle_pose_ = waypointToPoseStamped(waypoint_list_[0]);
           b_wp_is_reached_ = false;
         }
         else
@@ -954,7 +924,7 @@ void MissionSequencer::performDisarming()
     // transition to IDLE or PREARM state depending on stuff
     /// \todo TODO(scm): make this part a function called transitionToIDLE/PREARM which checks the wyapointlist etc.
     filenames_.erase(filenames_.begin());
-    waypointList_.clear();
+    waypoint_list_.clear();
     if (filenames_.size() == 0)
     {
       current_sequencer_state_ = SequencerState::IDLE;
@@ -1002,8 +972,8 @@ bool MissionSequencer::checkWaypoint(const geometry_msgs::PoseStamped& current_w
 
   if (diff_position < sequencer_params_.threshold_position_ && std::fabs(diff_yaw) < sequencer_params_.threshold_yaw_)
   {
-    ROS_INFO_STREAM("Reached Waypoint: x = " << waypointList_[0].x << ", y = " << waypointList_[0].y
-                                             << ", z = " << waypointList_[0].z << ", yaw = " << waypointList_[0].yaw);
+    ROS_INFO_STREAM("Reached Waypoint: x = " << waypoint_list_[0].x << ", y = " << waypoint_list_[0].y
+                                             << ", z = " << waypoint_list_[0].z << ", yaw = " << waypoint_list_[0].yaw);
     return true;
   }
 
@@ -1020,12 +990,29 @@ bool MissionSequencer::checkStateChange(const SequencerState new_state) const
       if (new_state == SequencerState::ARM)
         return true;
       break;
+
+    case SequencerState::PREARM:
+      // PREARM -> request(ARM) -> ARM
+      // PREARM -> request(READ) -> PREARM
+      if (new_state == SequencerState::ARM)
+        return true;
+      break;
+
     case SequencerState::ARM:
       // ARM -> request(TAKEOFF) --> TAKEOFF
       // ARM -> request(DISARM) --> DISARM
       if (new_state == SequencerState::TAKEOFF)
         return true;
       else if (new_state == SequencerState::DISARM)
+        return true;
+      break;
+
+    case SequencerState::TAKEOFF:
+      // TAKEOFF -> request(HOLD) --> HOLD
+      // TAKEOFF -> request(LAND) --> LAND
+      if (new_state == SequencerState::HOLD)
+        return true;
+      else if (new_state == SequencerState::LAND)
         return true;
       break;
 
@@ -1038,6 +1025,15 @@ bool MissionSequencer::checkStateChange(const SequencerState new_state) const
       else if (new_state == SequencerState::LAND)
         return true;
       else if (new_state == SequencerState::HOVER)
+        return true;
+      break;
+
+    case SequencerState::HOVER:
+      // HOVER -> request(LAND) --> LAND
+      // HOVER -> request(HOLD) --> HOLD
+      if (new_state == SequencerState::LAND)
+        return true;
+      else if (new_state == SequencerState::HOLD)
         return true;
       break;
 
@@ -1061,6 +1057,12 @@ bool MissionSequencer::checkStateChange(const SequencerState new_state) const
       else if (new_state == SequencerState::HOLD)
         return true;
       break;
+
+    case SequencerState::DISARM:
+    default:
+      // DISARM -> request(X) --> FAULT no change allowed
+      // default -> request(X) --> FAULT no change allowed
+      break;
   }
 
   // state change was not approved
@@ -1071,9 +1073,9 @@ bool MissionSequencer::checkStateChange(const SequencerState new_state) const
 
 bool MissionSequencer::executeLanding()
 {
-  if (srv_mavros_land_.call(landCmd_))
+  if (srv_mavros_land_.call(mavros_cmds_.land_cmd_))
   {
-    if (landCmd_.response.success)
+    if (mavros_cmds_.land_cmd_.response.success)
     {
       ROS_INFO("--> Landing");
       return true;
