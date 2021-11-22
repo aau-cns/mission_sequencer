@@ -722,46 +722,114 @@ void MissionSequencer::performMission()
       // set waypoint reached and reset timer
       b_wp_is_reached_ = true;
       time_last_wp_reached_ = ros::Time::now();
+
+      // transition to hover state at waypoint
+      current_sequencer_state_ = SequencerState::HOVER;
     }
 
     /// \todo maybe automatically go to hover here, and continue if time has been exceeded
     // check if holdtime was exceeded
-    if (b_wp_is_reached_ && (ros::Time::now().toSec() - time_last_wp_reached_.toSec()) > waypointList_[0].holdtime)
-    {
-      ROS_INFO_STREAM("Waited for: " << waypointList_[0].holdtime << " Seconds");
-      waypointList_.erase(waypointList_.begin());
-      // FIX(scm): make sure the list is not empty!!!
-      if (waypointList_.size() != 0)
-      {
-        setpoint_vehicle_pose_ = waypointToPoseStamped(waypointList_[0]);
-        b_wp_is_reached_ = false;
-      }
-    }
+    //    if (b_wp_is_reached_ && (ros::Time::now().toSec() - time_last_wp_reached_.toSec()) >
+    //    waypointList_[0].holdtime)
+    //    {
+    //      ROS_INFO_STREAM("Waited for: " << waypointList_[0].holdtime << " Seconds");
+    //      waypointList_.erase(waypointList_.begin());
+    //      // FIX(scm): make sure the list is not empty!!!
+    //      if (waypointList_.size() != 0)
+    //      {
+    //        setpoint_vehicle_pose_ = waypointToPoseStamped(waypointList_[0]);
+    //        b_wp_is_reached_ = false;
+    //      }
+    //    }
   }
   else
   {
     ROS_DEBUG_STREAM_THROTTLE(dbg_throttle_rate_, "* No more waypoints to follow...");
-    if (srv_mavros_land_.call(landCmd_) || b_do_automatically_land_)
+    // check for automatic transition to land state
+    if (b_do_automatically_land_)
     {
-      if (landCmd_.response.success)
-      {
-        ROS_INFO("Landing");
-        current_sequencer_state_ = SequencerState::LAND;
-
-        // Respond that mission succefully finished
-        publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::UNDEF, false, true);
-      }
     }
+
+    // publish mission completion
+    publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::UNDEF, false, true);
+
+    //    if (srv_mavros_land_.call(landCmd_) || b_do_automatically_land_)
+    //    {
+    //      if (landCmd_.response.success)
+    //      {
+    //        ROS_INFO("Landing");
+    //        current_sequencer_state_ = SequencerState::LAND;
+
+    //        // Respond that mission succefully finished
+    //        publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::UNDEF, false, true);
+    //      }
+    //    }
   }
-  if (b_do_verbose_)
-  {
-    ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_,
-                             "* currentFollowerState__::MISSION; waypoints left: " << waypointList_.size());
-  }
+
+  //  if (b_do_verbose_)
+  //  {
+  ROS_DEBUG_STREAM_THROTTLE(dbg_throttle_rate_,
+                            "* currentFollowerState__::MISSION; waypoints left: " << waypointList_.size());
+  //  }
 }
 
 void MissionSequencer::performHover()
 {
+  // check size of waypoints list
+  if (!waypointList_.empty())
+  {
+    bool b_transition_to_mission = true;
+    // check if the goal is to hold at waypoint
+    if (b_wp_is_reached_)
+    {
+      // holdtime check
+      if ((ros::Time::now().toSec() - time_last_wp_reached_.toSec()) > waypointList_[0].holdtime)
+      {
+        // waypoint has been completed, delete from list
+        ROS_INFO_STREAM("Waited for: " << waypointList_[0].holdtime << " Seconds");
+        waypointList_.erase(waypointList_.begin());
+
+        // FIX(scm): make sure the list is not empty!!!
+        if (waypointList_.size() != 0)
+        {
+          setpoint_vehicle_pose_ = waypointToPoseStamped(waypointList_[0]);
+          b_wp_is_reached_ = false;
+        }
+        else
+        {
+          // no more waypoints
+          b_transition_to_mission = false;
+
+          // publish mission completion
+          publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::UNDEF, false, true);
+
+          // check if automatically land
+          if (b_do_automatically_land_)
+          {
+            // transition to new state
+            current_sequencer_state_ = SequencerState::LAND;
+          }
+        }
+      }
+      else
+      {
+        // continue to hover
+        b_transition_to_mission = false;
+      }
+    }
+
+    // check if change to mission state is necessary
+    if (b_transition_to_mission)
+    {
+      current_sequencer_state_ = SequencerState::MISSION;
+    }
+  }
+  else
+  {
+    // no more waypoints --> hover at current setpoint
+    ROS_DEBUG_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::HOVER; hovering until new waypoint "
+                                                  "arrives...");
+  }
 }
 
 void MissionSequencer::performLand()
