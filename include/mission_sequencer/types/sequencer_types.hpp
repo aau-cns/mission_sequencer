@@ -23,6 +23,7 @@ namespace mission_sequencer
 /// \brief The SequencerState enum
 ///
 /// \todo make include for magic_enum
+/// \todo create enum for SequencerRequests (including READ & RESUME)
 /// \see https://github.com/Neargye/magic_enum
 ///
 enum class SequencerState
@@ -35,7 +36,10 @@ enum class SequencerState
   MISSION,
   HOLD,
   LAND,
-  DISARM
+  DISARM,
+
+  /// \deprecated will be moved to individual enum soon
+  RESUME
 };
 
 enum class TakeoffType

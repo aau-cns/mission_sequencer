@@ -39,7 +39,7 @@ MissionSequencer::MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh)
   , previous_sequencer_state_{ SequencerState::IDLE }
 {
   // setup parameters
-  sequencer_params_ = parse_ros_nodehandle(nh_);
+  sequencer_params_ = parse_ros_nodehandle(pnh_);
 
   // setup navigation variables
   current_vehicle_state_ = mavros_msgs::State();
@@ -272,16 +272,14 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
         current_sequencer_state_ = SequencerState::ARM;
 
         // Respond to request
-        publishResponse(current_mission_ID_, int(msg->request), true, false);
+        publishResponse(current_mission_ID_, msg->request, true, false);
       }
       else
       {
-        if (b_do_verbose_)
-        {
-          ROS_WARN_STREAM("* amaze_mission_sequencer::request::ARM - failed! Not in PREARM!");
-          ROS_WARN_STREAM("*   Valids: Pose=" << b_pose_is_valid_ << ", State=" << b_state_is_valid_
-                                              << ", extState=" << b_extstate_is_valid_);
-        }
+        ROS_WARN_STREAM("* mission_sequencer::request::ARM - failed! mavros communication or PREARM error!");
+        ROS_WARN_STREAM("*   Valids: Pose=" << b_pose_is_valid_ << ", State=" << b_state_is_valid_
+                                            << ", extState=" << b_extstate_is_valid_);
+
         b_wrong_input = true;
       }
       break;
@@ -312,6 +310,11 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
         {
           ROS_ERROR_STREAM("=> TakeoffType not implemented");
         }
+      }
+      else
+      {
+        ROS_WARN_STREAM("* mission_sequencer::request::TAKEOFF - failed! Probably not armed.");
+        b_wrong_input = true;
       }
       break;
     }
@@ -349,7 +352,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
     case mission_sequencer::MissionRequest::RESUME: {
       ROS_INFO_STREAM("* amaze_mission_sequencer::request::RESUME...");
       // check if change is approved
-      if (checkStateChange(previous_sequencer_state_))
+      if (checkStateChange(SequencerState::RESUME))
       {
         ROS_INFO_STREAM("Resuming Mission");
 
@@ -388,7 +391,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       {
         // wrong input - probably due to being in dis/armed or idle state
         ROS_WARN_STREAM("* amaze_mission_sequencer::request::LAND - failed! Not in above ground state.");
-        publishResponse(current_mission_ID_, msg->request, false, false);
+        b_wrong_input = true;
       }
       break;
     }
@@ -410,12 +413,17 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
         // respond to request --> completed immediatly
         publishResponse(current_mission_ID_, msg->request, true, true);
       }
+      else
+      {
+        ROS_WARN_STREAM("* mission_sequencer::request::HOVER - failed!");
+        b_wrong_input = true;
+      }
       break;
     }
 
     case mission_sequencer::MissionRequest::ABORT: {
-      ROS_FATAL_STREAM("* amaze_mission_sequencer::request::ABORT...");
-      ROS_INFO("Abort Mission - Landing");
+      ROS_FATAL_STREAM("* mission_sequencer::request::ABORT...");
+      ROS_WARN_STREAM("=> mission_sequencer: Abort Mission - NOT IMPLEMENTED");
       /// \todo TODO(scm): ABORT should disable usage of mission sequencer and put it into a locked state, that could
       /// only be reset by e.g. setting a dynamic parameter
       //      if (srv_mavros_land_.call(landCmd_))
@@ -449,7 +457,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       {
         // wrong input - probably due to being in dis/armed or idle state
         ROS_WARN_STREAM("* amaze_mission_sequencer::request::DISARM - failed! Not in safe armed state.");
-        publishResponse(current_mission_ID_, msg->request, false, false);
+        b_wrong_input = true;
       }
       break;
     }
@@ -497,7 +505,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
     }
 
     default:
-      ROS_ERROR("REQUEST NOT DEFINED");
+      ROS_ERROR_STREAM("=> mission_sequencer: REQUEST NOT DEFINED");
       b_wrong_input = true;
       break;
   }
@@ -505,7 +513,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
   // respond if false input was provided
   if (b_wrong_input)
   {
-    ROS_INFO_STREAM("WRONG REQUEST FOR CURRENT STATE: " << current_sequencer_state_);
+    ROS_ERROR_STREAM("=> mission_sequencer: ISSUE WITH REQUEST FOR CURRENT STATE: " << current_sequencer_state_);
     // Respond if input was wrong
     publishResponse(current_mission_ID_, msg->request, false, false);
   }
@@ -809,7 +817,7 @@ void MissionSequencer::performHover()
       if ((ros::Time::now().toSec() - time_last_wp_reached_.toSec()) > waypoint_list_[0].holdtime)
       {
         // waypoint has been completed, delete from list
-        ROS_INFO_STREAM("Waited for: " << waypoint_list_[0].holdtime << " Seconds");
+        ROS_INFO_STREAM("-    waited for: " << waypoint_list_[0].holdtime << " Seconds");
         waypoint_list_.erase(waypoint_list_.begin());
 
         // FIX(scm): make sure the list is not empty!!!
@@ -820,6 +828,8 @@ void MissionSequencer::performHover()
         }
         else
         {
+          ROS_INFO_STREAM("=> mission_sequencer: no more waypoints to fly to ...");
+
           // no more waypoints
           b_transition_to_mission = false;
 
@@ -829,6 +839,8 @@ void MissionSequencer::performHover()
           // check if automatically land
           if (b_do_automatically_land_)
           {
+            ROS_INFO_STREAM("=> mission_sequencer: automatically triggerde landing");
+
             // transition to new state
             current_sequencer_state_ = SequencerState::LAND;
           }
@@ -838,6 +850,9 @@ void MissionSequencer::performHover()
       {
         // continue to hover
         b_transition_to_mission = false;
+
+        ROS_DEBUG_STREAM_THROTTLE(dbg_throttle_rate_, "* sequencer_state::HOVER; hovering until holdtime at waypoint "
+                                                      "is reached ...");
       }
     }
 
@@ -850,13 +865,14 @@ void MissionSequencer::performHover()
   else
   {
     // no more waypoints --> hover at current setpoint
-    ROS_DEBUG_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::HOVER; hovering until new waypoint "
-                                                  "arrives...");
+    ROS_DEBUG_STREAM_THROTTLE(dbg_throttle_rate_, "* sequencer_state::HOVER; hovering until new waypoint "
+                                                  "arrives ...");
   }
 }
 
 void MissionSequencer::performLand()
 {
+  ROS_DEBUG_STREAM_THROTTLE(dbg_throttle_rate_, "* sequencer_state::LAND: performing landing ...");
   // call landing if not executed yet correctly
   if (!b_executed_landing_)
     b_executed_landing_ = executeLanding();
@@ -897,10 +913,12 @@ void MissionSequencer::performLand()
 
 void MissionSequencer::performHold()
 {
+  ROS_DEBUG_STREAM_THROTTLE(dbg_throttle_rate_, "* sequencer_state::HOLD");
 }
 
 void MissionSequencer::performDisarming()
 {
+  ROS_DEBUG_STREAM_THROTTLE(dbg_throttle_rate_, "* sequencer_state::DISARM");
   // check if vehicle is disarmed
   bool is_disarmed = true;
   if (current_vehicle_state_.armed)
@@ -919,19 +937,26 @@ void MissionSequencer::performDisarming()
   // at this stage it is disarmed
   if (is_disarmed)
   {
-    ROS_INFO("Disarmed");
+    ROS_INFO("=> mission_sequencer: Disarmed!");
 
     // transition to IDLE or PREARM state depending on stuff
     /// \todo TODO(scm): make this part a function called transitionToIDLE/PREARM which checks the wyapointlist etc.
-    filenames_.erase(filenames_.begin());
-    waypoint_list_.clear();
-    if (filenames_.size() == 0)
+    if (sequencer_params_.b_wp_from_file_)
     {
-      current_sequencer_state_ = SequencerState::IDLE;
+      filenames_.erase(filenames_.begin());
+      waypoint_list_.clear();
+      if (filenames_.size() == 0)
+      {
+        current_sequencer_state_ = SequencerState::IDLE;
+      }
+      else
+      {
+        current_sequencer_state_ = SequencerState::PREARM;
+      }
     }
     else
     {
-      current_sequencer_state_ = SequencerState::PREARM;
+      current_sequencer_state_ = SequencerState::IDLE;
     }
   }
 }
@@ -952,9 +977,11 @@ bool MissionSequencer::checkWaypoint(const geometry_msgs::PoseStamped& current_w
       std::pow(std::fabs(current_vehicle_pose_.pose.position.y - current_waypoint.pose.position.y), 2) +
       std::pow(std::fabs(current_vehicle_pose_.pose.position.z - current_waypoint.pose.position.z), 2);
   diff_position = std::sqrt(diff_squared);
-  ROS_DEBUG_STREAM("-   diff_position: " << diff_position);
+  ROS_DEBUG_STREAM_THROTTLE(0.5 * dbg_throttle_rate_, "-   diff_position: " << diff_position);
 
   // claculate yaw difference
+  /// \bug BUG(scm): this calculation does calculate the absulute angle between the two quaternions, should also include
+  /// roll/pitch!!!
   diff_yaw = std::fabs(
       2.0 *
       double(tf2::Quaternion(current_vehicle_pose_.pose.orientation.x, current_vehicle_pose_.pose.orientation.y,
@@ -966,14 +993,16 @@ bool MissionSequencer::checkWaypoint(const geometry_msgs::PoseStamped& current_w
   {
     diff_yaw -= 2 * M_PI;
   }
-  ROS_DEBUG_STREAM("-   diff_yaw:      " << diff_yaw);
+  ROS_DEBUG_STREAM_THROTTLE(0.5 * dbg_throttle_rate_, "-   diff_yaw:      " << diff_yaw);
 
   // check if waypoint has been reached
 
   if (diff_position < sequencer_params_.threshold_position_ && std::fabs(diff_yaw) < sequencer_params_.threshold_yaw_)
   {
-    ROS_INFO_STREAM("Reached Waypoint: x = " << waypoint_list_[0].x << ", y = " << waypoint_list_[0].y
-                                             << ", z = " << waypoint_list_[0].z << ", yaw = " << waypoint_list_[0].yaw);
+    /// \todo TODO(scm): provide the yaw somehow here
+    ROS_INFO_STREAM("Reached Waypoint: x = "
+                    << current_waypoint.pose.position.x << ", y = " << current_waypoint.pose.position.y
+                    << ", z = " << current_waypoint.pose.position.z /*<< ", yaw = " << waypoint_list_[0].yaw*/);
     return true;
   }
 
@@ -1040,14 +1069,25 @@ bool MissionSequencer::checkStateChange(const SequencerState new_state) const
     case SequencerState::HOLD:
       // HOLD -> request(RESUME) -> prevstate in MISSION, TAKEOFF, LAND, HOVER --> PREV_STATE
       // HOLD -> request(LAND) -> LAND
-      if (new_state == SequencerState::LAND)
-        return true;
-      else if (new_state == SequencerState::MISSION)
-        return true;
-      else if (new_state == SequencerState::HOVER)
-        return true;
-      else if (new_state == SequencerState::TAKEOFF)
-        return true;
+      //      if (new_state == SequencerState::LAND)
+      //        return true;
+      //      else if (new_state == SequencerState::MISSION)
+      //        return true;
+      //      else if (new_state == SequencerState::HOVER)
+      //        return true;
+      //      else if (new_state == SequencerState::TAKEOFF)
+      //        return true;
+      if (new_state == SequencerState::RESUME)
+      {
+        if (previous_sequencer_state_ == SequencerState::LAND)
+          return true;
+        else if (previous_sequencer_state_ == SequencerState::MISSION)
+          return true;
+        else if (previous_sequencer_state_ == SequencerState::HOVER)
+          return true;
+        else if (previous_sequencer_state_ == SequencerState::TAKEOFF)
+          return true;
+      }
       break;
 
     case SequencerState::LAND:

@@ -1,15 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <launch>
-  <arg name="node_name"               default="amaze_mission_sequencer"/>
+  <arg name="node_name"               default="mission_sequencer"/>
 
   <arg name="threshold_position"      default="0.3" />
   <arg name="threshold_yaw"           default="0.1" />
 
   <arg name="waypoint_filename"       default="" />
+
+  <arg name="automatic_sequencing"    default="False" /> <!-- if 'True', this parameter overwrites the auto land and disarm function -->
   <arg name="automatic_landing"       default="False" />
-  <arg name="verbose"                 default="False" />
+  <arg name="automatic_disarming"     default="True" />
   <arg name="relative_waypoints"      default="True" />
+  <arg name="waypoint_from_file"      default="False" />
+  <arg name="verbose"                 default="False" />
+
+  <arg name="takeoff_type_int"        default="0" />
+  <arg name="takeoff_height_m"        default="1.0" />
 
   <!-- default topic names for remapping (_i: input, _o: output)  type: sensor_msgs::Image -->
   <arg name="mavros_state_i"                    default="/mavros/state" />
@@ -28,13 +35,22 @@
 
 
   <!-- node -->
-  <node pkg="amaze_mission_sequencer" type="amaze_mission_sequencer_node" name="$(arg node_name)" output="screen" clear_params="true" required="true">
-    <param name="threshold_position"  value="$(arg threshold_position)" />
-    <param name="threshold_yaw"       value="$(arg threshold_yaw)" />
-    <param name="waypoint_filename"   value="$(arg waypoint_filename)" />
-    <param name="automatic_landing"   value="$(arg automatic_landing)" />
-    <param name="verbose"             value="$(arg verbose)" />
-    <param name="relative_waypoints"  value="$(arg relative_waypoints)" />
+  <node pkg="mission_sequencer" type="mission_sequencer_node" name="$(arg node_name)" output="screen" clear_params="true" required="true">
+    <param name="threshold_position_m"    value="$(arg threshold_position)" />
+    <param name="threshold_yaw_rad"       value="$(arg threshold_yaw)" />
+
+    <param name="takeoff_type"            value="$(arg takeoff_type_int)" />
+    <param name="takeoff_z_m"             value="$(arg takeoff_height_m)" />
+
+    <param name="waypoint_filename"       value="$(arg waypoint_filename)" />
+
+    <param name="do_automatic_sequence"   value="$(arg automatic_sequencing)" />
+    <param name="do_automatically_land"   value="$(arg automatic_landing)" />
+    <param name="do_automatically_disarm" value="$(arg automatic_disarming)" />
+    <param name="wp_are_relativ"          value="$(arg relative_waypoints)" />
+    <param name="wp_from_file"            value="$(arg waypoint_from_file)" />
+
+    <param name="verbose"                 value="$(arg verbose)" />
     <!--
     <remap from="mavros/state"                     to="$(arg mavros_state_i)" />
     <remap from="mavros/extended_state"            to="$(arg mavros_extended_state_i)" />
@@ -45,7 +61,7 @@
 
 
     <!--<param name="mavros_cmd_arming_o"    value="$(arg mavros_cmd_arming_o)" />
-    <param name="mavros_cmd_command_o"   value="$(arg mavros_cmd_command_o)" />   
+    <param name="mavros_cmd_command_o"   value="$(arg mavros_cmd_command_o)" />
     <param name="mavros_cmd_land_o"      value="$(arg mavros_cmd_land_o)" />
     <param name="mavros_set_mode_o"      value="$(arg mavros_set_mode_o)" /> -->
   </node>

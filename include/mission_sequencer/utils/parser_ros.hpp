@@ -23,15 +23,15 @@ MissionSequencerOptions parse_ros_nodehandle(ros::NodeHandle& nh)
 
   // ==========================================================================
   // NAVIGATION ===============================================================
-  if (!nh.param<double>("theshold_position_m", params.threshold_position_, params.threshold_position_))
+  if (!nh.param<double>("threshold_position_m", params.threshold_position_, params.threshold_position_))
   {
     ROS_WARN_STREAM("=> mission_sequencer: cannot load parameter for position threshold, using default of "
                     << params.threshold_position_ << " m.");
   }
-  if (!nh.param<double>("theshold_yaw_rad", params.threshold_yaw_, params.threshold_yaw_))
+  if (!nh.param<double>("threshold_yaw_rad", params.threshold_yaw_, params.threshold_yaw_))
   {
-    ROS_WARN_STREAM("=> mission_sequencer: cannot load parameter for position threshold, using default of "
-                    << params.threshold_position_ << " m.");
+    ROS_WARN_STREAM("=> mission_sequencer: cannot load parameter for yaw threshold, using default of "
+                    << params.threshold_yaw_ << " deg.");
   }
 
   // check if yaw is within expected boundaries - i.e. it does not make sense to have more than 180deg=pi in threshold

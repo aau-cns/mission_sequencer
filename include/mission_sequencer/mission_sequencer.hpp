@@ -257,7 +257,7 @@ private:
   double thresholdPosition_;
   double thresholdYaw_;
 
-  static const size_t dbg_throttle_rate_ = 10;
+  static constexpr double dbg_throttle_rate_ = 0.01; //3.0;
   std::string waypoint_fn_ = "";
 
   /// vector of filenames read from parameter server
