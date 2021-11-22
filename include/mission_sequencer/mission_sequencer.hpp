@@ -50,6 +50,30 @@ static const char* StateStr[] = { "IDLE", "ARM", "MISSION", "HOLD", "LAND", "DIS
 
 class MissionSequencer
 {
+private:
+  struct MavrosCommands
+  {
+    mavros_msgs::SetMode offboard_mode_;
+    mavros_msgs::CommandBool arm_cmd_;
+    mavros_msgs::CommandLong disarm_cmd_;
+    mavros_msgs::CommandTOL land_cmd_;
+
+    MavrosCommands()
+    {
+      // setup disarm command
+      disarm_cmd_.request.broadcast = false;
+      disarm_cmd_.request.command = 400;
+      disarm_cmd_.request.confirmation = 0;
+      disarm_cmd_.request.param1 = 0.0;
+      disarm_cmd_.request.param2 = 21196.0;
+      disarm_cmd_.request.param3 = 0.0;
+      disarm_cmd_.request.param4 = 0.0;
+      disarm_cmd_.request.param5 = 0.0;
+      disarm_cmd_.request.param6 = 0.0;
+      disarm_cmd_.request.param7 = 0.0;
+    }
+  };
+
   // ROS VARIABLES
 private:
   // ROS Node handles
@@ -140,16 +164,18 @@ private:
   void performAbort();
 
 private:
-  bool b_pose_is_valid_{ false };          //!< flag to determine if a valid pose has been received
-  bool b_state_is_valid_{ false };         //!< flag to determine if a valid mavros state has been received
-  bool b_extstate_is_valid_{ false };      //!< flag to determine if a valid extended mavros state has been received
-  bool b_is_landed_{ true };               //!< flag to determine if the vehicle has landed
-  bool b_do_auto_state_change_{ false };   //!< flag to determine if state changes should happen automatically or per
-                                           //!< request
-  bool b_do_automatically_land_{ false };  //!< flag to determine if vehicle should automatically land
-  bool b_wp_are_relativ_{ false };         //!< flag to determine if waypoints are relative to starting position
-  bool b_wp_is_reached_{ false };          //!< flag to determine if waypoint has been reached
-  bool b_do_verbose_{ false };             //!< flag to determine if debug output should be verbosed
+  bool b_pose_is_valid_{ false };            //!< flag to determine if a valid pose has been received
+  bool b_state_is_valid_{ false };           //!< flag to determine if a valid mavros state has been received
+  bool b_extstate_is_valid_{ false };        //!< flag to determine if a valid extended mavros state has been received
+  bool b_executed_landing_{ false };         //!< flag to determine if a landing command has been executed
+  bool b_is_landed_{ true };                 //!< flag to determine if the vehicle has landed
+  bool b_do_auto_state_change_{ false };     //!< flag to determine if state changes should happen automatically or per
+                                             //!< request
+  bool b_do_automatically_land_{ false };    //!< flag to determine if vehicle should automatically land
+  bool b_do_automatically_disarm_{ false };  //!< flag to deterime if vehicle should be automatically disarmed
+  bool b_wp_are_relativ_{ false };           //!< flag to determine if waypoints are relative to starting position
+  bool b_wp_is_reached_{ false };            //!< flag to determine if waypoint has been reached
+  bool b_do_verbose_{ false };               //!< flag to determine if debug output should be verbosed
                                 //!< \deprecated will be removed in next version and replaced by the ROS debug flag
 
   // state machine
@@ -169,12 +195,17 @@ private:
   mavros_msgs::ExtendedState current_vehicle_ext_state_;  //!< determines the current vehcile extended mavros state
 
   uint8_t current_mission_ID_;
+
+  // communication variables
+private:
+  MavrosCommands mavros_cmds_;
   // REST - WIP
 private:
   int requestNumber_;
 
   std::vector<ParseWaypoint::Waypoint> waypointList_;
   ros::Time time_last_wp_reached_;
+
 
   mavros_msgs::SetMode offboardMode_;
   mavros_msgs::CommandBool armCmd_;
@@ -200,6 +231,8 @@ private:
 
   bool checkWaypoint(const geometry_msgs::PoseStamped& current_waypoint);
   bool checkStateChange(const SequencerState new_state) const;
+
+  bool executeLanding();
 
 public:
   MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh);

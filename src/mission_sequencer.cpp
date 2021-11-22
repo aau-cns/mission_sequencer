@@ -267,10 +267,9 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
   switch (msg->request)
   {
       // arming, no takeoff
-    case mission_sequencer::MissionRequest::ARM:
-      ROS_INFO_STREAM("* amaze_mission_sequencer::request::ARM...");
-      if (current_sequencer_state_ == SequencerState::PREARM && b_pose_is_valid_ && b_state_is_valid_ &&
-          b_extstate_is_valid_)
+    case mission_sequencer::MissionRequest::ARM: {
+      ROS_DEBUG_STREAM("* amaze_mission_sequencer::request::ARM...");
+      if (checkStateChange(SequencerState::ARM) && b_pose_is_valid_ && b_state_is_valid_ && b_extstate_is_valid_)
       {
         //        // Take first entry of filename list
         //        std::string filename = filenames_[0];
@@ -317,6 +316,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
         b_wrong_input = true;
       }
       break;
+    }
 
     case mission_sequencer::MissionRequest::TAKEOFF: {
       ROS_DEBUG_STREAM("* amaze_mission_sequencer::request::TAKEOFF...");
@@ -404,74 +404,83 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       break;
     }
 
-    case mission_sequencer::MissionRequest::ABORT:
-      if (b_do_verbose_)
+    case mission_sequencer::MissionRequest::LAND: {
+      ROS_DEBUG_STREAM("* amaze_mission_sequencer::request::LAND...");
+      if (checkStateChange(SequencerState::LAND))
       {
-        ROS_INFO_STREAM("* amaze_mission_sequencer::request::ABORT...");
+        // execute landing
+        b_executed_landing_ = executeLanding();
+
+        // transition to new state
+        current_sequencer_state_ = SequencerState::LAND;
+
+        // respond to request --> completed upon landing
+        publishResponse(current_mission_ID_, msg->request, true, false);
       }
+      else
+      {
+        // wrong input - probably due to being in dis/armed or idle state
+        ROS_WARN_STREAM("* amaze_mission_sequencer::request::LAND - failed! Not in above ground state.");
+        publishResponse(current_mission_ID_, msg->request, false, false);
+      }
+      break;
+    }
+
+    case mission_sequencer::MissionRequest::HOVER: {
+      ROS_DEBUG_STREAM("* amaze_mission_sequencer::request::HOVER...");
+      if (checkStateChange(SequencerState::HOVER))
+      {
+      }
+      break;
+    }
+
+    case mission_sequencer::MissionRequest::ABORT: {
+      ROS_FATAL_STREAM("* amaze_mission_sequencer::request::ABORT...");
       ROS_INFO("Abort Mission - Landing");
-      if (srv_mavros_land_.call(landCmd_))
-      {
-        if (landCmd_.response.success)
-        {
-          ROS_INFO("Landing");
-          current_sequencer_state_ = LAND;
-        }
-      }
-      current_sequencer_state_ = LAND;
+      /// \todo TODO(scm): ABORT should disable usage of mission sequencer and put it into a locked state, that could
+      /// only be reset by e.g. setting a dynamic parameter
+      //      if (srv_mavros_land_.call(landCmd_))
+      //      {
+      //        if (landCmd_.response.success)
+      //        {
+      //          ROS_INFO("Landing");
+      //          current_sequencer_state_ = LAND;
+      //        }
+      //      }
+      //      current_sequencer_state_ = LAND;
 
-      // Respond to request
-      publishResponse(current_mission_ID_, int(msg->request), true, false);
+      // respond to request --> completed immediatly
+      publishResponse(current_mission_ID_, msg->request, true, true);
       break;
+    }
 
-    case mission_sequencer::MissionRequest::LAND:
-      if (b_do_verbose_)
-      {
-        ROS_INFO_STREAM("* amaze_mission_sequencer::request::LAND...");
-      }
-      if (srv_mavros_land_.call(landCmd_))
-      {
-        if (landCmd_.response.success)
-        {
-          ROS_INFO("Landing");
-          current_sequencer_state_ = LAND;
-        }
-      }
-      current_sequencer_state_ = LAND;
-
-      // Respond to request
-      publishResponse(current_mission_ID_, int(msg->request), true, false);
-      break;
-
-    case mission_sequencer::MissionRequest::DISARM:
-
-      // Preparation for arming
-      disarmCmd_.request.broadcast = false;
-      disarmCmd_.request.command = 400;
-      disarmCmd_.request.confirmation = 0;
-      disarmCmd_.request.param1 = 0.0;
-      disarmCmd_.request.param2 = 21196.0;
-      disarmCmd_.request.param3 = 0.0;
-      disarmCmd_.request.param4 = 0.0;
-      disarmCmd_.request.param5 = 0.0;
-      disarmCmd_.request.param6 = 0.0;
-      disarmCmd_.request.param7 = 0.0;
-      disarmRequestTime_ = ros::Time::now();
-
-      // Set state
+    case mission_sequencer::MissionRequest::DISARM: {
       ROS_INFO_STREAM("* amaze_mission_sequencer::request::DISARM...");
-      current_sequencer_state_ = DISARM;
+      if (checkStateChange(SequencerState::DISARM))
+      {
+        // Preparation for arming
+        disarmRequestTime_ = ros::Time::now();
 
-      // Respond to request
-      publishResponse(current_mission_ID_, int(msg->request), true, false);
+        // transition to new state
+        current_sequencer_state_ = SequencerState::DISARM;
+
+        // Respond to request --> completed upon disarming
+        publishResponse(current_mission_ID_, msg->request, true, false);
+      }
+      {
+        // wrong input - probably due to being in dis/armed or idle state
+        ROS_WARN_STREAM("* amaze_mission_sequencer::request::DISARM - failed! Not in safe armed state.");
+        publishResponse(current_mission_ID_, msg->request, false, false);
+      }
       break;
+    }
 
-    case mission_sequencer::MissionRequest::READ:
+    case mission_sequencer::MissionRequest::READ: {
       if (b_do_verbose_)
       {
         ROS_INFO_STREAM("* amaze_mission_sequencer::request::READ...");
       }
-      if (current_sequencer_state_ == IDLE)
+      if (current_sequencer_state_ == SequencerState::IDLE)
       {
         try
         {
@@ -487,7 +496,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
           // Respond that mission has been loaded
           publishResponse(current_mission_ID_, int(msg->request), true, false);
 
-          current_sequencer_state_ = PREARM;
+          current_sequencer_state_ = SequencerState::PREARM;
         }
         catch (const std::exception& e)
         {
@@ -506,17 +515,19 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
         b_wrong_input = true;
       }
       break;
+    }
 
     default:
       ROS_ERROR("REQUEST NOT DEFINED");
       break;
   }
 
+  // respond if false input was provided
   if (b_wrong_input)
   {
-    ROS_INFO_STREAM("WRONG REQUEST FOR CURRENT STATE: " << StateStr[current_sequencer_state_]);
+    ROS_INFO_STREAM("WRONG REQUEST FOR CURRENT STATE: " << current_sequencer_state_);
     // Respond if input was wrong
-    publishResponse(current_mission_ID_, int(msg->request), false, false);
+    publishResponse(current_mission_ID_, msg->request, false, false);
   }
 };
 
@@ -752,27 +763,42 @@ void MissionSequencer::performMission()
 void MissionSequencer::performHover()
 {
 }
+
 void MissionSequencer::performLand()
 {
+  // call landing if not executed yet correctly
+  if (!b_executed_landing_)
+    b_executed_landing_ = executeLanding();
+
+  // mavros check to see if landed
   if (current_vehicle_ext_state_.landed_state == current_vehicle_ext_state_.LANDED_STATE_ON_GROUND)
   {
+    // set landed states
     b_is_landed_ = true;
 
+    // check if vehicle is armed
     if (!current_vehicle_state_.armed)
     {
-      if (b_do_verbose_)
-      {
-        ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::LAND->LANDED --> set state to "
-                                                     "IDLE");
-      }
-      current_sequencer_state_ = IDLE;
+      // not armed --> go into IDLE
+      ROS_DEBUG_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::LAND->LANDED --> set state to "
+                                                    "IDLE");
+
+      // transition to new state
+      current_sequencer_state_ = SequencerState::IDLE;
     }
     else
     {
-      if (b_do_verbose_)
+      // still armed
+      ROS_DEBUG_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::LAND->LANDED --> Vehicle still "
+                                                    "ARMED");
+
+      // perform auto disarm
+      if (b_do_automatically_disarm_)
       {
-        ROS_INFO_STREAM_THROTTLE(dbg_throttle_rate_, "* currentFollowerState__::LAND->LANDED --> Vehicle still "
-                                                     "ARMED");
+        ROS_INFO_STREAM("* performLand(): automaticall disarming vehicle");
+
+        // transition to disarm state
+        current_sequencer_state_ = SequencerState::DISARM;
       }
     }
   }
@@ -784,62 +810,38 @@ void MissionSequencer::performHold()
 
 void MissionSequencer::performDisarming()
 {
+  // check if vehicle is disarmed
   bool is_disarmed = true;
   if (current_vehicle_state_.armed)
   {
+    // vehicle is currently armed, issue disarm command
     is_disarmed = false;
-    if (srv_mavros_disarm_.call(disarmCmd_))
+    if (srv_mavros_disarm_.call(mavros_cmds_.disarm_cmd_))
     {
-      if (disarmCmd_.response.success)
+      if (mavros_cmds_.disarm_cmd_.response.success)
       {
         is_disarmed = true;
       }
     }
-
-    // If you still want to let the PX$ check for vehicle on the ground than
-    // de-comment the following code and move the above snippent into
-    // the else condition below
-
-    // if(!this.landed_)
-    //{
-    //	if (currentExtendedVehicleState_.landed_state == currentExtendedVehicleState_.LANDED_STATE_ON_GROUND)
-    //	{
-    //		landed_ = true;
-    //		ROS_INFO("Landed");
-    //	}
-    //} else {
-    //
-    //}
   }
 
+  // at this stage it is disarmed
   if (is_disarmed)
   {
     ROS_INFO("Disarmed");
+
+    // transition to IDLE or PREARM state depending on stuff
+    /// \todo TODO(scm): make this part a function called transitionToIDLE/PREARM which checks the wyapointlist etc.
     filenames_.erase(filenames_.begin());
     waypointList_.clear();
     if (filenames_.size() == 0)
     {
-      current_sequencer_state_ = IDLE;
+      current_sequencer_state_ = SequencerState::IDLE;
     }
     else
     {
-      current_sequencer_state_ = PREARM;
+      current_sequencer_state_ = SequencerState::PREARM;
     }
-
-    // If you still want to let the PX$ check for vehicle on the ground than
-    // de-comment the following code and move the above snippent into
-    // the else condition below
-
-    // if(!this.landed_)
-    //{
-    //  if (currentExtendedVehicleState_.landed_state == currentExtendedVehicleState_.LANDED_STATE_ON_GROUND)
-    //  {
-    //      landed_ = true;
-    //      ROS_INFO("Landed");
-    //  }
-    //} else {
-    //
-    //}
   }
 }
 
@@ -892,6 +894,11 @@ bool MissionSequencer::checkStateChange(const SequencerState new_state) const
 {
   switch (current_sequencer_state_)
   {
+    case SequencerState::IDLE:
+      // IDLE -> request(ARM) --> PREARM/ARM
+      if (new_state == SequencerState::ARM)
+        return true;
+      break;
     case SequencerState::ARM:
       // ARM -> request(TAKEOFF) --> TAKEOFF
       // ARM -> request(DISARM) --> DISARM
@@ -925,11 +932,33 @@ bool MissionSequencer::checkStateChange(const SequencerState new_state) const
       else if (new_state == SequencerState::TAKEOFF)
         return true;
       break;
+
+    case SequencerState::LAND:
+      // LAND -> request(DISARM) -> DISARM
+      if (new_state == SequencerState::DISARM)
+        return true;
+      else if (new_state == SequencerState::HOLD)
+        return true;
+      break;
   }
 
   // state change was not approved
   ROS_ERROR_STREAM("=> No known state transition from " << current_sequencer_state_ << " to " << new_state);
   ROS_ERROR_STREAM("   Staying in " << current_sequencer_state_);
+  return false;
+}
+
+bool MissionSequencer::executeLanding()
+{
+  if (srv_mavros_land_.call(landCmd_))
+  {
+    if (landCmd_.response.success)
+    {
+      ROS_INFO("--> Landing");
+      return true;
+    }
+  }
+
   return false;
 }
 
