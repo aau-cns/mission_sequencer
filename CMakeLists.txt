@@ -1,28 +1,6 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(mission_sequencer)
 
-## Costum functions
-# Define function "source_group_by_path with three mandatory arguments (PARENT_PATH, REGEX, GROUP, ...)
-# to group source files in folders (e.g. for MSVC solutions).
-#
-# Example:
-# source_group_by_path("${CMAKE_CURRENT_SOURCE_DIR}/src" "\\\\.h$|\\\\.inl$|\\\\.cpp$|\\\\.c$|\\\\.ui$|\\\\.qrc$" "Source Files" ${sources})
-function(source_group_by_path PARENT_PATH REGEX GROUP)
-
-    foreach (FILENAME ${ARGN})
-
-        get_filename_component(FILEPATH "${FILENAME}" REALPATH)
-        file(RELATIVE_PATH FILEPATH ${PARENT_PATH} ${FILEPATH})
-        get_filename_component(FILEPATH "${FILEPATH}" DIRECTORY)
-
-        string(REPLACE "/" "\\" FILEPATH "${FILEPATH}")
-
-        source_group("${GROUP}\\${FILEPATH}" REGULAR_EXPRESSION "${REGEX}" FILES ${FILENAME})
-
-    endforeach()
-
-endfunction(source_group_by_path)
-
 ## Determine CMAKE options
 if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release")
@@ -61,6 +39,13 @@ endif ()
 message("Build Type: " ${CMAKE_BUILD_TYPE})
 message(WARNING "CMAKE_CXX_FLAGES: ${CMAKE_CXX_FLAGS}")
 
+#####
+# COSTUM CMAKE
+#####
+
+# Include custom cmake modules
+include(cmake/Custom.cmake)
+include(cmake/GetGitRevisionDescription.cmake)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -295,3 +280,32 @@ target_link_libraries(${PROJECT_NAME}_node
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+
+###################
+## Documentation ##
+###################
+
+# Get git revision
+get_git_head_revision(GIT_REFSPEC GIT_SHA1)
+string(SUBSTRING "${GIT_SHA1}" 0 12 GIT_REV)
+if(NOT GIT_SHA1)
+    set(GIT_REV "0")
+endif()
+
+# Meta information about the project
+set(META_PROJECT_NAME        "mission_sequencer")
+set(META_PROJECT_DESCRIPTION "ROS mission sequencer for PX4")
+set(META_AUTHOR_ORGANIZATION "University Klagenfurt: CNS")
+set(META_AUTHOR_DOMAIN       "https://gitlab.aau.at/aau-cns/ros_pkgs/amaze_mission_sequencer")
+set(META_AUTHOR_MAINTAINER   "martin.scheiber@aau.at")
+set(META_VERSION_MAJOR       "0")
+set(META_VERSION_MINOR       "1")
+set(META_VERSION_PATCH       "0")
+set(META_VERSION_REVISION    "${GIT_REV}")
+set(META_VERSION             "${META_VERSION_MAJOR}.${META_VERSION_MINOR}.${META_VERSION_PATCH}")
+set(META_NAME_VERSION        "${META_PROJECT_NAME} v${META_VERSION} (${META_VERSION_REVISION})")
+set(META_CMAKE_INIT_SHA      "${GIT_REV}")
+
+
+option(OPTION_BUILD_DOCS     "Build documentation." ON)
+add_subdirectory(docs)

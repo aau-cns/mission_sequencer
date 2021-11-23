@@ -18,9 +18,8 @@
 
 namespace mission_sequencer
 {
-
 ///
-/// \brief The SequencerState enum
+/// \brief The SequencerState enum describes the current state of the MissionSequencer
 ///
 /// \todo make include for magic_enum
 /// \todo create enum for SequencerRequests (including READ & RESUME)
@@ -28,27 +27,30 @@ namespace mission_sequencer
 ///
 enum class SequencerState
 {
-  IDLE,
-  PREARM,
-  ARM,
-  TAKEOFF,
-  HOVER,
-  MISSION,
-  HOLD,
-  LAND,
-  DISARM,
+  IDLE,     //!< IDLE state, when sequencer has not been started
+  PREARM,   //!< PREARM state, when sequencer has loaded waypoint file and is ready to arm for WP takeoff
+  ARM,      //!< ARM state, when vehicle is armed (rotors spinning) but has not yet taken off
+  TAKEOFF,  //!< TAKEOFF state, when vehicle is in TO phase
+  HOVER,    //!< HOVER state, when vehicle is hovering (holding position until new WPs arrive)
+  MISSION,  //!< MISSION state, when vehicle is flying to WP
+  HOLD,     //!< HOLD state, when vehicle is holding position until RESUME request arrives
+  LAND,     //!< LAND state, when vehicle is in landing phase
+  DISARM,   //!< DISARM state, when vehicle is tring to disarm (turn off motors)
 
   /// \deprecated will be moved to individual enum soon
   RESUME
 };
 
+///
+/// \brief The TakeoffType enum describes the type of takeoff control in use
+///
 enum class TakeoffType
 {
-  POSITION,
-  VELOCITY
+  POSITION,  //!< POSITION based control takeoff type
+  VELOCITY   //!< VELOCITY based control takeoff type
 };
 
-static std::ostream& operator<<(std::ostream& os, SequencerState state)
+inline static std::ostream& operator<<(std::ostream& os, SequencerState state)
 {
   switch (state)
   {
@@ -70,12 +72,27 @@ static std::ostream& operator<<(std::ostream& os, SequencerState state)
       return os << "LAND";
     case SequencerState::DISARM:
       return os << "DISARM";
+    case SequencerState::RESUME:
+      return os << "RESUME";
       // omit default case to trigger compiler warning for missing cases
   }
 
   return os;
 }
 
+inline static std::ostream& operator<<(std::ostream& os, TakeoffType type)
+{
+  switch (type)
+  {
+    case TakeoffType::POSITION:
+      return os << "POSITION";
+    case TakeoffType::VELOCITY:
+      return os << "VELOCITY";
+      // omit default case to trigger compiler warning for missing cases
+  }
+
+  return os;
+}
 
 }  // namespace mission_sequencer
 

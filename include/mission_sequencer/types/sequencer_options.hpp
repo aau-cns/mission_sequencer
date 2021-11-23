@@ -11,6 +11,8 @@
 #ifndef MS_SEQUENCER_OPTIONS_HPP_
 #define MS_SEQUENCER_OPTIONS_HPP_
 
+#include <ros/ros.h>
+
 #include "types/sequencer_types.hpp"
 
 namespace mission_sequencer
@@ -30,38 +32,95 @@ struct MissionSequencerOptions
   TakeoffType takeoff_type_{ TakeoffType::POSITION };
 
   /// takeoff height/velocity in z-direction in meters (per second)
-  /// the interpretation depends on the TakeoffType chosen in takeoff_type_
+  /// the interpretation depends on the TakeoffType chosen in MissionSequencerOptions::takeoff_type_
   double takeoff_z_{ 1.0 };
 
   /// path to file where potential waypoints are stored
-  /// this will only be used if b_wp_from_file_ is set to true
+  /// this will only be used if MissionSequencerOptions::b_wp_from_file_ is set to true
   std::string filename_wps_{ "" };
 
-  void printNavigation()
+  inline void printNavigation()
   {
+    ROS_INFO_STREAM("==> sequencer_options: Parameter Summary -- Navigation");
+    ROS_INFO_STREAM("\t- threshold_position_:         " << threshold_position_);
+    ROS_INFO_STREAM("\t- threshold_yaw_:              " << threshold_yaw_);
+    ROS_INFO_STREAM("\t- takeoff_type_:               " << takeoff_type_);
+    ROS_INFO_STREAM("\t- takeoff_z_:                  " << takeoff_z_);
+    ROS_INFO_STREAM("\t- filename_wps_:               " << filename_wps_);
   }
 
   // ==========================================================================
   // SEQUENCER OPTIONS ========================================================
 
+  /// flag to determine if mission sequencer should automatically switch states
+  /// if 'true' this overwrites MissionSequencerOptions::b_do_automatically_land_ and MissionSequencerOptions::b_do_automatically_disarm_
   bool b_do_autosequence_{ false };
+
+  /// flag to determine if mission sequencer should automatically land once all waypoints have been reached
+  /// \attention disable this if you want to fly with manual inputs
   bool b_do_automatically_land_{ false };
+
+  /// flag to determine if mission sequencer should automatically disarm once landed
   bool b_do_automatically_disarm_{ false };
+
+  /// flag to determine if received WP are relative to starting pose
+  /// the starting pose is determined when the TAKEOFF request has been sent
   bool b_wp_are_relative_{ false };
+
+  /// flag to determine if waypoints are read from a file
+  /// this requires filname_wps_ to include a filename or transmition of file parameters through the file topic
   bool b_wp_from_file_{ false };
+
+  /// flag to determine if additional verbose output is turned on
+  /// \deprecated this will be removed and switched to ROS_DEBUG_STREAM for verbose output
   bool b_do_verbose{ false };
 
-  void printSequencer()
+  inline void printSequencer()
   {
+    ROS_INFO_STREAM("==> sequencer_options: Parameter Summary -- Sequencer");
+    ROS_INFO_STREAM("\t- b_do_autosequence_:          " << b_do_autosequence_);
+    ROS_INFO_STREAM("\t- b_do_automatically_land_:    " << b_do_automatically_land_);
+    ROS_INFO_STREAM("\t- b_do_automatically_disarm_:  " << b_do_automatically_disarm_);
+    ROS_INFO_STREAM("\t- b_wp_are_relative_:          " << b_wp_are_relative_);
+    ROS_INFO_STREAM("\t- b_wp_from_file_:             " << b_wp_from_file_);
+    ROS_INFO_STREAM("\t- b_do_verbose:                " << b_do_verbose);
   }
 
   // ==========================================================================
   // ROS OPTIONS ==============================================================
 
+  /// ROS service used for arming the vehicle
   std::string srv_cmd_arming_{ "/mavros/cmd/arming" };
+
+  /// ROS service used for disarming the vehicle
   std::string srv_cmd_command_{ "/mavros/cmd/command" };
+
+  /// ROS service used for issuing land command
   std::string srv_cmd_land_{ "/mavros/cmd/land" };
+
+  /// ROS service used to set the mission mode
   std::string srv_cmd_set_mode_{ "/mavros/set_mode" };
+
+  inline void printROS()
+  {
+    ROS_INFO_STREAM("==> sequencer_options: Parameter Summary -- ROS");
+    ROS_INFO_STREAM("\t- srv_cmd_arming_:             " << srv_cmd_arming_);
+    ROS_INFO_STREAM("\t- srv_cmd_command_:            " << srv_cmd_command_);
+    ROS_INFO_STREAM("\t- srv_cmd_land_:               " << srv_cmd_land_);
+    ROS_INFO_STREAM("\t- srv_cmd_set_mode_:           " << srv_cmd_set_mode_);
+  }
+
+  // ==========================================================================
+  // DEBUG OPTIONS ============================================================
+
+  /// determines the time period for writing and saving ROS debug messages
+  static constexpr double topic_debug_interval_ = 4.0;
+
+  inline void printDebug()
+  {
+    ROS_DEBUG_STREAM("==> sequencer_options: Parameter Summary -- ROS");
+    ROS_DEBUG_STREAM("\t- topic_debug_interval_:       " << topic_debug_interval_);
+  }
 
 };  // class MissionSequencerOptions
 }  // namespace mission_sequencer
