@@ -28,6 +28,7 @@
 
 // Include Publisher Messages
 #include <mission_sequencer/MissionResponse.h>
+#include <mission_sequencer/MissionWaypoint.h>
 #include <mission_sequencer/MissionWaypointArray.h>
 
 // Include Services
@@ -46,7 +47,6 @@
 
 namespace mission_sequencer
 {
-
 class MissionSequencer
 {
 private:
@@ -117,6 +117,7 @@ private:
   ros::Publisher pub_pose_setpoint_;  //!< ROS publisher for current setpoint
   ros::Publisher pub_ms_response_;  //!< ROS publisher for mission sequencer request's response. This is similar to the
                                     //!< action feedback given once the request has been fullfilled.
+  ros::Publisher pub_waypoint_list_;  //!< ROS publisher for current waypoint list
 
   // ROS Subscribers
   ros::Subscriber sub_vehicle_state_;           //!< ROS subscriber for mavros vehicle state
@@ -254,10 +255,7 @@ private:
   // REST - WIP
 private:
 
-  double thresholdPosition_;
-  double thresholdYaw_;
-
-  static constexpr double dbg_throttle_rate_ = 0.01; //3.0;
+  static constexpr double dbg_throttle_rate_ = 0.01;  // 3.0;
   std::string waypoint_fn_ = "";
 
   /// vector of filenames read from parameter server

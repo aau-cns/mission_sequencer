@@ -78,6 +78,7 @@ MissionSequencer::MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh)
   // setup ROS publishers (relative to node's namespace)
   pub_pose_setpoint_ = nh_.advertise<geometry_msgs::PoseStamped>("mavros/setpoint_position/local", 10);
   pub_ms_response_ = nh_.advertise<mission_sequencer::MissionResponse>("autonomy/response", 10);
+  pub_waypoint_list_ = nh_.advertise<mission_sequencer::MissionWaypointArray>("get_waypoint_list", 1);
 
   // setup ROS services (relative to node's namespace)
   srv_mavros_arm_ = nh_.serviceClient<mavros_msgs::CommandBool>(sequencer_params_.srv_cmd_arming_);
@@ -671,9 +672,29 @@ void MissionSequencer::publishPoseSetpoint(void)
 {
   if (current_vehicle_state_.connected && b_pose_is_valid_)
   {
+    ros::Time pub_time = ros::Time::now();
     setpoint_vehicle_pose_.header = std_msgs::Header();
-    setpoint_vehicle_pose_.header.stamp = ros::Time::now();
+    setpoint_vehicle_pose_.header.stamp = pub_time;
     pub_pose_setpoint_.publish(setpoint_vehicle_pose_);
+
+    /// \todo make this function part of the parser
+    // publish waypoint list
+    MissionWaypointArray wps_msg;
+    wps_msg.waypoints.clear();
+    for (const auto wp_value : waypoint_list_)
+    {
+      MissionWaypoint wp;
+      wp.x = wp_value.x;
+      wp.y = wp_value.y;
+      wp.z = wp_value.z;
+      wp.yaw = wp_value.yaw;
+      wp.holdtime = wp_value.holdtime;
+      wps_msg.waypoints.push_back(wp);
+    }
+    wps_msg.header = std_msgs::Header();
+    wps_msg.header.stamp = pub_time;
+
+    pub_waypoint_list_.publish(wps_msg);
   }
 };
 
