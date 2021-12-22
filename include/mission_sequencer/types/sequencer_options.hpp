@@ -13,12 +13,20 @@
 
 #include <ros/ros.h>
 
+#include <eigen3/Eigen/Eigen>
+
 #include "types/sequencer_types.hpp"
 
 namespace mission_sequencer
 {
 struct MissionSequencerOptions
 {
+  enum class BoundReference
+  {
+    LOCAL,
+    GLOBAL,
+  };
+
   // ==========================================================================
   // NAVIGATION ===============================================================
   /// threshold in position to determine if waypoint was reached in meters
@@ -39,6 +47,15 @@ struct MissionSequencerOptions
   /// this will only be used if MissionSequencerOptions::b_wp_from_file_ is set to true
   std::string filename_wps_{ "" };
 
+  /// maximum boundary for new waypoints (w.r.t. starting pose or global)
+  Eigen::Vector3d bound_max_{ 1.0, 1.0, 1.0 };
+
+  /// minimum boundary for new waypoints (w.r.t. starting pose or global)
+  Eigen::Vector3d bound_min_{ -1.0, -1.0, 0.0 };
+
+  /// reference frame of boundary
+  BoundReference bound_ref_{ BoundReference::LOCAL };
+
   inline void printNavigation()
   {
     ROS_INFO_STREAM("==> sequencer_options: Parameter Summary -- Navigation");
@@ -47,13 +64,16 @@ struct MissionSequencerOptions
     ROS_INFO_STREAM("\t- takeoff_type_:               " << takeoff_type_);
     ROS_INFO_STREAM("\t- takeoff_z_:                  " << takeoff_z_);
     ROS_INFO_STREAM("\t- filename_wps_:               " << filename_wps_);
+    ROS_INFO_STREAM("\t- bound_max_:                  " << bound_max_.transpose());
+    ROS_INFO_STREAM("\t- bound_min_:                  " << bound_min_.transpose());
   }
 
   // ==========================================================================
   // SEQUENCER OPTIONS ========================================================
 
   /// flag to determine if mission sequencer should automatically switch states
-  /// if 'true' this overwrites MissionSequencerOptions::b_do_automatically_land_ and MissionSequencerOptions::b_do_automatically_disarm_
+  /// if 'true' this overwrites MissionSequencerOptions::b_do_automatically_land_ and
+  /// MissionSequencerOptions::b_do_automatically_disarm_
   bool b_do_autosequence_{ false };
 
   /// flag to determine if mission sequencer should automatically land once all waypoints have been reached

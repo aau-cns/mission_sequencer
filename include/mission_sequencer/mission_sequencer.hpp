@@ -49,6 +49,14 @@ namespace mission_sequencer
 {
 class MissionSequencer
 {
+public:
+//  friend inline std::ostream& operator<<(std::ostream os, geometry_msgs::PoseStamped pose)
+//  {
+//    return os << "[[" << pose.pose.position.x << ", " << pose.pose.position.y << ", " << pose.pose.position.z << "], "
+//              << pose.pose.orientation.w << ", " << pose.pose.orientation.x << ", " << pose.pose.orientation.y << ", "
+//              << pose.pose.orientation.z << "]]";
+//  }
+
 private:
   ///
   /// \brief The MavrosCommands struct implements a hardcoded structure to easily send ARM, DISARM, LAND and MODE
@@ -222,7 +230,7 @@ private:
                                              //!< request
   bool b_do_automatically_land_{ false };    //!< flag to determine if vehicle should automatically land
   bool b_do_automatically_disarm_{ false };  //!< flag to deterime if vehicle should be automatically disarmed
-  bool b_wp_are_relativ_{ false };           //!< flag to determine if waypoints are relative to starting position
+  bool b_wp_are_relativ_{ false };           //!< \deprecated flag to determine if waypoints are relative to starting position
   bool b_wp_is_reached_{ false };            //!< flag to determine if waypoint has been reached
   bool b_do_verbose_{ false };               //!< flag to determine if debug output should be verbosed
                                 //!< \deprecated will be removed in next version and replaced by the ROS debug flag
@@ -254,7 +262,6 @@ private:
 
   // REST - WIP
 private:
-
   static constexpr double dbg_throttle_rate_ = 0.01;  // 3.0;
   std::string waypoint_fn_ = "";
 

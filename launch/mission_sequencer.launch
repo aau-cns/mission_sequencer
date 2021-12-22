@@ -47,7 +47,7 @@
     <param name="do_automatic_sequence"   value="$(arg automatic_sequencing)" />
     <param name="do_automatically_land"   value="$(arg automatic_landing)" />
     <param name="do_automatically_disarm" value="$(arg automatic_disarming)" />
-    <param name="wp_are_relativ"          value="$(arg relative_waypoints)" />
+    <param name="wp_are_relative"         value="$(arg relative_waypoints)" />
     <param name="wp_from_file"            value="$(arg waypoint_from_file)" />
 
     <param name="verbose"                 value="$(arg verbose)" />

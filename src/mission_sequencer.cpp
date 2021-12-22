@@ -257,7 +257,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
 
         // Set initial pose
         starting_vehicle_pose_ = current_vehicle_pose_;
-        setpoint_vehicle_pose_ = starting_vehicle_pose_;
+        setpoint_vehicle_pose_ = current_vehicle_pose_;
 
         //        if (waypointList_.size() == 0)
         //        {
@@ -298,7 +298,10 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
         {
           // set starting position if they are relative
           if (sequencer_params_.b_wp_are_relative_)
+          {
             starting_vehicle_pose_ = current_vehicle_pose_;
+          }
+          ROS_DEBUG_STREAM("*   starting_pose: " << starting_vehicle_pose_);
 
           // set takeoff position
           setpoint_takeoff_pose_ = starting_vehicle_pose_;
@@ -588,6 +591,7 @@ void MissionSequencer::publishResponse(const uint8_t& id, const uint8_t& request
 
 geometry_msgs::PoseStamped MissionSequencer::waypointToPoseStamped(const ParseWaypoint::Waypoint& waypoint)
 {
+
   geometry_msgs::PoseStamped pose;
 
   pose.pose.position.x = waypoint.x;
@@ -597,7 +601,7 @@ geometry_msgs::PoseStamped MissionSequencer::waypointToPoseStamped(const ParseWa
   tf2::Quaternion waypointQuaternion;
   waypointQuaternion.setRotation(tf2::Vector3(0, 0, 1), waypoint.yaw * DEG_TO_RAD);
   waypointQuaternion.normalize();
-  if (b_wp_are_relativ_)
+  if (sequencer_params_.b_wp_are_relative_)
   {
     tf2::Quaternion startingQuaternion(
         starting_vehicle_pose_.pose.orientation.x, starting_vehicle_pose_.pose.orientation.y,
@@ -769,8 +773,44 @@ void MissionSequencer::performMission()
   // check if we still have waypoints in the list
   if (waypoint_list_.size() > 0)
   {
+    geometry_msgs::PoseStamped next_wp = waypointToPoseStamped(waypoint_list_[0]);
+    /// \todo TODO(scm): make this check part of the WP callback, such that it is not checked at the check rate, i.e.
+    /// 20Hz
+    // check if waypoint is within boundaries
+    Eigen::Vector3d cur_pos =
+        Eigen::Vector3d(next_wp.pose.position.x, next_wp.pose.position.y, next_wp.pose.position.z);
+    Eigen::Vector3d calc_min = cur_pos;
+    Eigen::Vector3d calc_max = -cur_pos;
+
+    switch (sequencer_params_.bound_ref_)
+    {
+      case MissionSequencerOptions::BoundReference::GLOBAL: {
+        calc_min -= sequencer_params_.bound_min_;
+        calc_max += sequencer_params_.bound_max_;
+        break;
+      }
+      case MissionSequencerOptions::BoundReference::LOCAL: {
+        Eigen::Vector3d start_pos(starting_vehicle_pose_.pose.position.x, starting_vehicle_pose_.pose.position.y,
+                                  starting_vehicle_pose_.pose.position.z);
+        calc_min -= (sequencer_params_.bound_min_ + start_pos);
+        calc_max += (sequencer_params_.bound_max_ + start_pos);
+        break;
+      }
+    }
+
+    if (calc_min.x() < 0 || calc_min.y() < 0 || calc_min.z() < 0 || calc_max.x() < 0 || calc_max.y() < 0 ||
+        calc_max.z() < 0)
+    {
+      ROS_WARN_STREAM("next waypoint out of bounds; skipping ... (" << cur_pos.transpose() << ")");
+      ROS_DEBUG_STREAM("bounds diff\n\tmin: " << calc_min.transpose() << "\n\tmax: " << calc_max.transpose());
+      waypoint_list_.erase(waypoint_list_.begin());
+      return;
+      /// \todo TODO(scm) this could be solved better, such that we iterate through all next waypoints until suitable is
+      /// found!
+    }
+
     // check if waypoint has been reached
-    if (!b_wp_is_reached_ && checkWaypoint(waypointToPoseStamped(waypoint_list_[0])))
+    if (!b_wp_is_reached_ && checkWaypoint(next_wp))
     {
       // set waypoint reached and reset timer
       b_wp_is_reached_ = true;
@@ -995,6 +1035,8 @@ bool MissionSequencer::checkWaypoint(const geometry_msgs::PoseStamped& current_w
 {
   // set the current setpoint
   setpoint_vehicle_pose_ = current_waypoint;
+  ROS_DEBUG_STREAM_THROTTLE(0.5 * sequencer_params_.topic_debug_interval_,
+                            "-   waypoint:      " << setpoint_vehicle_pose_);
 
   double diff_position, diff_yaw;
   // calculate position difference
@@ -1006,8 +1048,8 @@ bool MissionSequencer::checkWaypoint(const geometry_msgs::PoseStamped& current_w
   ROS_DEBUG_STREAM_THROTTLE(0.5 * sequencer_params_.topic_debug_interval_, "-   diff_position: " << diff_position);
 
   // claculate yaw difference
-  /// \bug BUG(scm): this calculation does calculate the absulute angle between the two quaternions, should also include
-  /// roll/pitch!!!
+  /// \bug BUG(scm): this calculation does calculate the absulute angle between the two quaternions, should also
+  /// include roll/pitch!!!
   diff_yaw = std::fabs(
       2.0 *
       double(tf2::Quaternion(current_vehicle_pose_.pose.orientation.x, current_vehicle_pose_.pose.orientation.y,
