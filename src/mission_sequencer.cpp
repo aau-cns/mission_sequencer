@@ -242,30 +242,9 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       ROS_DEBUG_STREAM("* mission_sequencer::request::ARM...");
       if (checkStateChange(SequencerState::ARM) && b_pose_is_valid_ && b_state_is_valid_ && b_extstate_is_valid_)
       {
-        //        // Take first entry of filename list
-        //        std::string filename = filenames_[0];
-
-        //        std::vector<std::string> header_default = { "x", "y", "z", "yaw", "holdtime" };
-        //        std::shared_ptr<ParseWaypoint> WaypointParser = std::make_shared<ParseWaypoint>(filename,
-        //        header_default);
-
-        //        // Parse waypoint file
-        //        WaypointParser->readParseCsv();
-
-        //        // Get the data
-        //        waypointList_ = WaypointParser->getData();
-
         // Set initial pose
         starting_vehicle_pose_ = current_vehicle_pose_;
         setpoint_vehicle_pose_ = current_vehicle_pose_;
-
-        //        if (waypointList_.size() == 0)
-        //        {
-        //          // Error if waypoint list is empty
-        //          publishResponse(missionID_, int(msg->request), false, false);
-        //          ROS_INFO_STREAM("MISSION FILE EMPTY");
-        //          return;
-        //        }
 
         // Preparation for arming
         mavros_cmds_.arm_cmd_.request.value = true;  // QUESTION(scm); is this actually needed?
