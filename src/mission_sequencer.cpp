@@ -727,7 +727,7 @@ void MissionSequencer::performArming()
   }
   else
   {
-    if (b_do_auto_state_change_)
+    if (sequencer_params_.b_do_autosequence_)
     {
       ROS_INFO("Starting Mission");
       ROS_INFO("Taking off");
@@ -830,8 +830,9 @@ void MissionSequencer::performMission()
   {
     ROS_DEBUG_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_, "* No more waypoints to follow...");
     // check for automatic transition to land state
-    if (b_do_automatically_land_)
+    if (sequencer_params_.b_do_automatically_land_)
     {
+      ROS_ERROR_STREAM("* automatical landing NOT YET IMPLEMENTED");
     }
 
     // publish mission completion
@@ -890,7 +891,7 @@ void MissionSequencer::performHover()
           publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::UNDEF, false, true);
 
           // check if automatically land
-          if (b_do_automatically_land_)
+          if (sequencer_params_.b_do_automatically_land_)
           {
             ROS_INFO_STREAM("=> mission_sequencer: automatically triggerde landing");
 

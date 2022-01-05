@@ -50,12 +50,14 @@ namespace mission_sequencer
 class MissionSequencer
 {
 public:
-//  friend inline std::ostream& operator<<(std::ostream os, geometry_msgs::PoseStamped pose)
-//  {
-//    return os << "[[" << pose.pose.position.x << ", " << pose.pose.position.y << ", " << pose.pose.position.z << "], "
-//              << pose.pose.orientation.w << ", " << pose.pose.orientation.x << ", " << pose.pose.orientation.y << ", "
-//              << pose.pose.orientation.z << "]]";
-//  }
+  //  friend inline std::ostream& operator<<(std::ostream os, geometry_msgs::PoseStamped pose)
+  //  {
+  //    return os << "[[" << pose.pose.position.x << ", " << pose.pose.position.y << ", " << pose.pose.position.z << "],
+  //    "
+  //              << pose.pose.orientation.w << ", " << pose.pose.orientation.x << ", " << pose.pose.orientation.y << ",
+  //              "
+  //              << pose.pose.orientation.z << "]]";
+  //  }
 
 private:
   ///
@@ -221,19 +223,20 @@ private:
   void performAbort();
 
 private:
-  bool b_pose_is_valid_{ false };            //!< flag to determine if a valid pose has been received
-  bool b_state_is_valid_{ false };           //!< flag to determine if a valid mavros state has been received
-  bool b_extstate_is_valid_{ false };        //!< flag to determine if a valid extended mavros state has been received
-  bool b_executed_landing_{ false };         //!< flag to determine if a landing command has been executed
-  bool b_is_landed_{ true };                 //!< flag to determine if the vehicle has landed
-  bool b_do_auto_state_change_{ false };     //!< flag to determine if state changes should happen automatically or per
-                                             //!< request
-  bool b_do_automatically_land_{ false };    //!< flag to determine if vehicle should automatically land
-  bool b_do_automatically_disarm_{ false };  //!< flag to deterime if vehicle should be automatically disarmed
-  bool b_wp_are_relativ_{ false };           //!< \deprecated flag to determine if waypoints are relative to starting position
-  bool b_wp_is_reached_{ false };            //!< flag to determine if waypoint has been reached
-  bool b_do_verbose_{ false };               //!< flag to determine if debug output should be verbosed
-                                //!< \deprecated will be removed in next version and replaced by the ROS debug flag
+  bool b_pose_is_valid_{ false };         //!< flag to determine if a valid pose has been received
+  bool b_state_is_valid_{ false };        //!< flag to determine if a valid mavros state has been received
+  bool b_extstate_is_valid_{ false };     //!< flag to determine if a valid extended mavros state has been received
+  bool b_executed_landing_{ false };      //!< flag to determine if a landing command has been executed
+  bool b_is_landed_{ true };              //!< flag to determine if the vehicle has landed
+  bool b_do_auto_state_change_{ false };  //!< \deprecated flag to determine if state changes should happen
+                                          //!< automatically or per request
+  bool b_do_automatically_land_{ false };    //!< \deprecated flag to determine if vehicle should automatically land
+  bool b_do_automatically_disarm_{ false };  //!< \deprecated flag to deterime if vehicle should be automatically
+                                             //!< disarmed
+  bool b_wp_are_relativ_{ false };  //!< \deprecated flag to determine if waypoints are relative to starting position
+  bool b_wp_is_reached_{ false };   //!< flag to determine if waypoint has been reached
+  bool b_do_verbose_{ false };      //!< flag to determine if debug output should be verbosed
+                                    //!< \deprecated will be removed in next version and replaced by the ROS debug flag
 
   // state machine
 private:
