@@ -29,9 +29,9 @@ int main(int argc, char** argv)
 
   while (ros::ok())
   {
+    ros::spinOnce();  // perform callback first such that topics are up to date
     sequencer.logic();  // Non-blocking logic ;)
     sequencer.publishPoseSetpoint();
-    ros::spinOnce();
     rate.sleep();
   }
 

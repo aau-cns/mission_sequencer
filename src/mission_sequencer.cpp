@@ -574,7 +574,6 @@ void MissionSequencer::publishResponse(const uint8_t& id, const uint8_t& request
 
 geometry_msgs::PoseStamped MissionSequencer::waypointToPoseStamped(const ParseWaypoint::Waypoint& waypoint)
 {
-
   geometry_msgs::PoseStamped pose;
 
   pose.pose.position.x = waypoint.x;
@@ -698,19 +697,21 @@ void MissionSequencer::performArming()
   if (!current_vehicle_state_.armed)
   {
     // check offboard mode
-    if (current_vehicle_state_.mode != "OFFBOARD" &&
-        (ros::Time::now().toSec() - mavros_cmds_.time_offboard_request.toSec() > 2.5))
+    if (current_vehicle_state_.mode != "OFFBOARD")
     {
-      if (srv_mavros_set_mode_.call(mavros_cmds_.offboard_mode_) && mavros_cmds_.offboard_mode_.response.mode_sent)
+      if (ros::Time::now().toSec() - mavros_cmds_.time_offboard_request.toSec() > 2.5)
       {
-        ROS_INFO("Offboard enabled");
+        if (srv_mavros_set_mode_.call(mavros_cmds_.offboard_mode_) && mavros_cmds_.offboard_mode_.response.mode_sent)
+        {
+          ROS_INFO("Offboard enabled");
+        }
+        mavros_cmds_.time_offboard_request = ros::Time::now();
       }
-      mavros_cmds_.time_offboard_request = ros::Time::now();
     }
     else
     {
       // check if we can arm
-      if (!current_vehicle_state_.armed && (ros::Time::now().toSec() - mavros_cmds_.time_arm_request.toSec() > 2.5))
+      if (ros::Time::now().toSec() - mavros_cmds_.time_arm_request.toSec() > 2.5)
       {
         if (srv_mavros_arm_.call(mavros_cmds_.arm_cmd_) && mavros_cmds_.arm_cmd_.response.success)
         {
