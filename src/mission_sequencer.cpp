@@ -289,6 +289,9 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
           // set waypoint reached to false and transition to new state
           b_wp_is_reached_ = false;
           current_sequencer_state_ = SequencerState::TAKEOFF;
+
+          // Respond to request
+          publishResponse(current_mission_ID_, msg->request, true, false);
         }
         else
         {
@@ -711,11 +714,13 @@ void MissionSequencer::performArming()
         if (srv_mavros_arm_.call(mavros_cmds_.arm_cmd_) && mavros_cmds_.arm_cmd_.response.success)
         {
           ROS_INFO("Vehicle armed");
+          // set armed to true as the next callback might be further away than the request to takeoff
+          current_vehicle_state_.armed = true;
+
+          // respond to completion of arming
+          publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::ARM, false, true);
         }
         mavros_cmds_.time_arm_request = ros::Time::now();
-
-        // respond to completion of arming
-        publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::ARM, false, true);
       }
     }
   }
@@ -1037,7 +1042,9 @@ bool MissionSequencer::checkWaypoint(const geometry_msgs::PoseStamped& current_w
   // set the current setpoint
   setpoint_vehicle_pose_ = current_waypoint;
   ROS_DEBUG_STREAM_THROTTLE(0.5 * sequencer_params_.topic_debug_interval_,
-                            "-   waypoint:      " << setpoint_vehicle_pose_);
+                            "-   waypoint:      " << setpoint_vehicle_pose_.pose);
+  ROS_DEBUG_STREAM_THROTTLE(0.5 * sequencer_params_.topic_debug_interval_,
+                            "-   pose:          " << current_vehicle_pose_.pose);
 
   double diff_position, diff_yaw;
   // calculate position difference
