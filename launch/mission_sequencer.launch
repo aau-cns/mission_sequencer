@@ -32,7 +32,8 @@
   <arg name="mavros_cmd_land_o"                 default="/mavros/cmd/land" />
   <arg name="mavros_set_mode_o"                 default="/mavros/set_mode" />
 
-
+  <arg name="bound_max"                         default="[1.0, 1.0, 1.0]"/>
+  <arg name="bound_min"                         default="[-1.0, -1.0, 0.0]"/>
 
   <!-- node -->
   <node pkg="mission_sequencer" type="mission_sequencer_node" name="$(arg node_name)" output="screen" clear_params="true" required="true">
@@ -64,5 +65,8 @@
     <param name="mavros_cmd_command_o"   value="$(arg mavros_cmd_command_o)" />
     <param name="mavros_cmd_land_o"      value="$(arg mavros_cmd_land_o)" />
     <param name="mavros_set_mode_o"      value="$(arg mavros_set_mode_o)" /> -->
+
+    <rosparam param="bound_max"          subst_value="True">$(arg bound_max)</rosparam>
+    <rosparam param="bound_min"          subst_value="True">$(arg bound_min)</rosparam>
   </node>
 </launch>

@@ -63,6 +63,12 @@ MissionSequencerOptions parse_ros_nodehandle(ros::NodeHandle& nh)
   nh.param<double>("takeoff_z_m", params.takeoff_z_, params.takeoff_z_);
   nh.param<std::string>("waypoint_filename", params.filename_wps_, params.filename_wps_);
 
+  std::vector<double> bound_max, bound_min;
+  nh.param<std::vector<double>>("bound_max", bound_max, { 1.0, 1.0, 1.0 });
+  params.bound_max_ << bound_max.at(0), bound_max.at(1), bound_max.at(2);
+  nh.param<std::vector<double>>("bound_min", bound_min, { -1.0, -1.0, 0.0 });
+  params.bound_min_ << bound_min.at(0), bound_min.at(1), bound_min.at(2);
+
   // output navigation params
   params.printNavigation();
 
