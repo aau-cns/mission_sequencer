@@ -287,7 +287,7 @@ private:
   /// The mission_id is deemed suitable if it is exactly the same as the current_mission_ID_ or if the
   /// current_sequencer_state is either IDLE or PREARM given that the request_id corresponds to a READ request.
   ///
-  bool checkMissionID(const uint8_t& mission_id, const uint8_t& request_id) const;
+  bool checkMissionID(const uint8_t& mission_id, const uint8_t& request_id);
 
   ///
   /// \brief executeLanding executes any landing by sending the command to the mavros interface

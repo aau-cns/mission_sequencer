@@ -227,7 +227,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
   {
     // WRONG ID
     // check if the request is to read mission files
-    ROS_INFO_STREAM("WRONG MISSION ID FOR CURRENT STATE: " << current_sequencer_state_ << "; Local mission ID:"
+    ROS_INFO_STREAM("WRONG MISSION ID FOR CURRENT STATE: " << current_sequencer_state_ << "; Local mission ID: "
                                                            << current_mission_ID_ << " msg ID: " << int(msg->id));
     // Respond if input was wrong
     publishResponse(current_mission_ID_, msg->request, false, false);
@@ -270,7 +270,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       ROS_DEBUG_STREAM("* mission_sequencer::request::TAKEOFF...");
       // check if change is approved
       /// \todo TODO(scm): if enum conversion from string exists (or int) then this can be put outside the switch
-      if (checkStateChange(SequencerState::TAKEOFF))
+      if (checkStateChange(SequencerState::TAKEOFF) && current_vehicle_state_.armed)
       {
         // state change to TAKEOFF is approved
         if (sequencer_params_.takeoff_type_ == TakeoffType::POSITION)
@@ -713,6 +713,9 @@ void MissionSequencer::performArming()
           ROS_INFO("Vehicle armed");
         }
         mavros_cmds_.time_arm_request = ros::Time::now();
+
+        // respond to completion of arming
+        publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::ARM, false, true);
       }
     }
   }
@@ -743,6 +746,9 @@ void MissionSequencer::performTakeoff()
       // setpoint reached --> go into hover mode
       ROS_INFO_STREAM("==> TAKEOFF completed");
       current_sequencer_state_ = SequencerState::HOVER;
+
+      // respond to completion of takeoff
+      publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::TAKEOFF, false, true);
     }
   }
 }
@@ -921,10 +927,13 @@ void MissionSequencer::performLand()
     b_executed_landing_ = executeLanding();
 
   // mavros check to see if landed
-  if (current_vehicle_ext_state_.landed_state == current_vehicle_ext_state_.LANDED_STATE_ON_GROUND)
+  if (current_vehicle_ext_state_.landed_state == current_vehicle_ext_state_.LANDED_STATE_ON_GROUND && !b_is_landed_)
   {
     // set landed states
     b_is_landed_ = true;
+
+    // respond to completion of landing
+    publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::LAND, false, true);
 
     // check if vehicle is armed
     if (!current_vehicle_state_.armed)
@@ -936,12 +945,15 @@ void MissionSequencer::performLand()
 
       // transition to new state
       current_sequencer_state_ = SequencerState::IDLE;
+
+      // respond to completion of disarm
+      publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::DISARM, false, true);
     }
     else
     {
       // still armed
       ROS_DEBUG_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_, "* SequencerState::LAND->LANDED --> "
-                                                                         "Vehicle still "
+                                                                         "Vehicle definetly still "
                                                                          "ARMED");
 
       // perform auto disarm
@@ -953,6 +965,13 @@ void MissionSequencer::performLand()
         current_sequencer_state_ = SequencerState::DISARM;
       }
     }
+  }
+  else
+  {
+    // still armed
+    ROS_DEBUG_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_, "* SequencerState::LAND->LANDED --> "
+                                                                       "Vehicle still might be still "
+                                                                       "ARMED");
   }
 }
 
@@ -975,6 +994,9 @@ void MissionSequencer::performDisarming()
       if (mavros_cmds_.disarm_cmd_.response.success)
       {
         is_disarmed = true;
+
+        // respond to completion of disarm
+        publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::DISARM, false, true);
       }
     }
   }
@@ -1172,7 +1194,7 @@ bool MissionSequencer::executeLanding()
   return false;
 }
 
-bool MissionSequencer::checkMissionID(const uint8_t& mission_id, const uint8_t& request_id) const
+bool MissionSequencer::checkMissionID(const uint8_t& mission_id, const uint8_t& request_id)
 {
   // check mission ID
   if (current_mission_ID_ != mission_id)
@@ -1182,6 +1204,11 @@ bool MissionSequencer::checkMissionID(const uint8_t& mission_id, const uint8_t& 
     if (request_id == mission_sequencer::MissionRequest::READ &&
         (current_sequencer_state_ == SequencerState::IDLE || current_sequencer_state_ == SequencerState::PREARM))
     {
+      return true;
+    }
+    else if (request_id == mission_sequencer::MissionRequest::ARM && current_sequencer_state_ == SequencerState::IDLE)
+    {
+      current_mission_ID_ = mission_id;
       return true;
     }
 
