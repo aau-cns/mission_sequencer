@@ -441,6 +441,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
         // Respond to request --> completed upon disarming
         publishResponse(current_mission_ID_, msg->request, true, false);
       }
+      else
       {
         // wrong input - probably due to being in dis/armed or idle state
         ROS_WARN_STREAM("* mission_sequencer::request::DISARM - failed! Not in safe armed state.");
@@ -962,7 +963,7 @@ void MissionSequencer::performLand()
                                                                          "ARMED");
 
       // perform auto disarm
-      if (b_do_automatically_disarm_)
+      if (sequencer_params_.b_do_automatically_disarm_)
       {
         ROS_INFO_STREAM("* performLand(): automaticall disarming vehicle");
 
