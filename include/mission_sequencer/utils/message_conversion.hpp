@@ -20,12 +20,12 @@ namespace mission_sequencer
 class MSMsgConv
 {
 public:
-  static std::vector<ParseWaypoint::Waypoint> WaypointArray2WaypointList(const std::vector<mission_sequencer::MissionWaypoint>& waypoint_array)
+  static std::vector<ParseWaypoint::Waypoint> WaypointArray2WaypointList(const std::vector<mission_sequencer::MissionWaypoint>& waypoint_array, const bool wp_are_global=false)
   {
     std::vector<ParseWaypoint::Waypoint> waypoint_list;
     for (const auto wp : waypoint_array)
     {
-      waypoint_list.push_back(ParseWaypoint::Waypoint(wp.x, wp.y, wp.z, wp.yaw, wp.holdtime));
+      waypoint_list.push_back(ParseWaypoint::Waypoint(wp.x, wp.y, wp.z, wp.yaw, wp.holdtime, wp_are_global));
     }
 
     return waypoint_list;

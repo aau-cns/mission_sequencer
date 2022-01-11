@@ -13,3 +13,6 @@ uint8 INSERT = 2
 
 # buffer position (index) in case of insert
 uint8 idx
+
+# defines if the position given is global (should not effect the yaw though)
+bool is_global

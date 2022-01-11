@@ -53,10 +53,12 @@ public:
     double yaw;
     double holdtime;
 
+    bool is_global{ false };
+
     Waypoint(){};
 
-    Waypoint(double _x, double _y, double _z, double _yaw, double _holdtime)
-      : x(_x), y(_y), z(_z), yaw(_yaw), holdtime(_holdtime){};
+    Waypoint(double _x, double _y, double _z, double _yaw, double _holdtime, bool _is_global=false)
+      : x(_x), y(_y), z(_z), yaw(_yaw), holdtime(_holdtime), is_global(_is_global){};
   };
 
   /**

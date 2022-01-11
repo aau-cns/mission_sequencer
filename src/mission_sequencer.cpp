@@ -519,7 +519,8 @@ void MissionSequencer::cbWaypointFilename(const std_msgs::String::ConstPtr& msg)
 
 void MissionSequencer::cbWaypointList(const mission_sequencer::MissionWaypointArrayConstPtr& msg)
 {
-  std::vector<ParseWaypoint::Waypoint> new_waypoints = MSMsgConv::WaypointArray2WaypointList(msg->waypoints);
+  std::vector<ParseWaypoint::Waypoint> new_waypoints =
+      MSMsgConv::WaypointArray2WaypointList(msg->waypoints, msg->is_global);
   if (new_waypoints.empty())
   {
     ROS_ERROR_STREAM("=> cbWaypointList: Could not add new waypoints as list is empty.");
@@ -591,14 +592,17 @@ geometry_msgs::PoseStamped MissionSequencer::waypointToPoseStamped(const ParseWa
 
     waypointQuaternion = startingQuaternion * waypointQuaternion;
 
-    double startingYaw, startingPitch, startingRoll;
-    tf2::Matrix3x3(startingQuaternion).getEulerYPR(startingYaw, startingPitch, startingRoll);
+    if (!waypoint.is_global)
+    {
+      double startingYaw, startingPitch, startingRoll;
+      tf2::Matrix3x3(startingQuaternion).getEulerYPR(startingYaw, startingPitch, startingRoll);
 
-    pose.pose.position.x =
-        (waypoint.x * cos(startingYaw) - waypoint.y * sin(startingYaw)) + starting_vehicle_pose_.pose.position.x;
-    pose.pose.position.y =
-        (waypoint.x * sin(startingYaw) + waypoint.y * cos(startingYaw)) + starting_vehicle_pose_.pose.position.y;
-    pose.pose.position.z = waypoint.z + starting_vehicle_pose_.pose.position.z;
+      pose.pose.position.x =
+          (waypoint.x * cos(startingYaw) - waypoint.y * sin(startingYaw)) + starting_vehicle_pose_.pose.position.x;
+      pose.pose.position.y =
+          (waypoint.x * sin(startingYaw) + waypoint.y * cos(startingYaw)) + starting_vehicle_pose_.pose.position.y;
+      pose.pose.position.z = waypoint.z + starting_vehicle_pose_.pose.position.z;
+    }
   }
 
   pose.pose.orientation.x = waypointQuaternion[0];
@@ -1139,9 +1143,12 @@ bool MissionSequencer::checkStateChange(const SequencerState new_state) const
     case SequencerState::HOVER:
       // HOVER -> request(LAND) --> LAND
       // HOVER -> request(HOLD) --> HOLD
+      // HOVER -> request(HOVER) --> HOVER
       if (new_state == SequencerState::LAND)
         return true;
       else if (new_state == SequencerState::HOLD)
+        return true;
+      else if (new_state == SequencerState::HOVER)
         return true;
       break;
 
