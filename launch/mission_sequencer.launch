@@ -34,6 +34,7 @@
 
   <arg name="bound_max"                         default="[1.0, 1.0, 1.0]"/>
   <arg name="bound_min"                         default="[-1.0, -1.0, 0.0]"/>
+  <arg name="boundary_reference"                default="LOCAL" />
 
   <!-- node -->
   <node pkg="mission_sequencer" type="mission_sequencer_node" name="$(arg node_name)" output="screen" clear_params="true" required="true">

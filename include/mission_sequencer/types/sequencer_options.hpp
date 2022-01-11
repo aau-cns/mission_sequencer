@@ -27,6 +27,19 @@ struct MissionSequencerOptions
     GLOBAL,
   };
 
+  friend inline std::ostream& operator<<(std::ostream& os, BoundReference ref)
+  {
+    switch(ref)
+    {
+      case BoundReference::GLOBAL:
+        return os << "GLOBAL";
+      case BoundReference::LOCAL:
+        return os << "LOCAL";
+    }
+
+    return os;
+  }
+
   // ==========================================================================
   // NAVIGATION ===============================================================
   /// threshold in position to determine if waypoint was reached in meters
@@ -66,6 +79,7 @@ struct MissionSequencerOptions
     ROS_INFO_STREAM("\t- filename_wps_:               " << filename_wps_);
     ROS_INFO_STREAM("\t- bound_max_:                  " << bound_max_.transpose());
     ROS_INFO_STREAM("\t- bound_min_:                  " << bound_min_.transpose());
+    ROS_INFO_STREAM("\t- bound_ref_:                  " << bound_ref_);
   }
 
   // ==========================================================================
