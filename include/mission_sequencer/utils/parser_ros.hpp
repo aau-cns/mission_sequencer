@@ -69,17 +69,17 @@ MissionSequencerOptions parse_ros_nodehandle(ros::NodeHandle& nh)
   nh.param<std::vector<double>>("bound_min", bound_min, { -1.0, -1.0, 0.0 });
   params.bound_min_ << bound_min.at(0), bound_min.at(1), bound_min.at(2);
 
-  std::string bound_ref = "LOCAL";
-  nh.param<std::string>("boundary_reference", bound_ref, bound_ref);
-  if (bound_ref == "LOCAL")
-    params.bound_ref_ = MissionSequencerOptions::BoundReference::LOCAL;
-  else if (bound_ref == "GLOBAL")
-    params.bound_ref_ = MissionSequencerOptions::BoundReference::GLOBAL;
-  else
-  {
-    ROS_WARN_STREAM("=> mission_sequencer: unknown boundary reference " << bound_ref <<". Defaulting to LOCAL.");
-    params.bound_ref_ = MissionSequencerOptions::BoundReference::LOCAL;
-  }
+//  std::string bound_ref = "LOCAL";
+//  nh.param<std::string>("boundary_reference", bound_ref, bound_ref);
+//  if (bound_ref == "LOCAL")
+//    params.bound_ref_ = MissionSequencerOptions::BoundReference::LOCAL;
+//  else if (bound_ref == "GLOBAL")
+//    params.bound_ref_ = MissionSequencerOptions::BoundReference::GLOBAL;
+//  else
+//  {
+//    ROS_WARN_STREAM("=> mission_sequencer: unknown boundary reference " << bound_ref <<". Defaulting to LOCAL.");
+//    params.bound_ref_ = MissionSequencerOptions::BoundReference::LOCAL;
+//  }
 
 
   // output navigation params

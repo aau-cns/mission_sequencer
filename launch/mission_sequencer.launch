@@ -69,5 +69,6 @@
 
     <rosparam param="bound_max"          subst_value="True">$(arg bound_max)</rosparam>
     <rosparam param="bound_min"          subst_value="True">$(arg bound_min)</rosparam>
+    <param name="boundary_reference"     value="$(arg boundary_reference)" />
   </node>
 </launch>

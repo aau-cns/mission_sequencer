@@ -67,7 +67,7 @@ struct MissionSequencerOptions
   Eigen::Vector3d bound_min_{ -1.0, -1.0, 0.0 };
 
   /// reference frame of boundary
-  BoundReference bound_ref_{ BoundReference::LOCAL };
+  BoundReference bound_ref_{ BoundReference::GLOBAL };
 
   inline void printNavigation()
   {
