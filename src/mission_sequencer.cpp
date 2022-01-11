@@ -543,8 +543,10 @@ void MissionSequencer::cbWaypointList(const mission_sequencer::MissionWaypointAr
     std::vector<ParseWaypoint::Waypoint>::iterator it_cur_wp = waypoint_list_.end();
     if (msg->action == mission_sequencer::MissionWaypointArray::INSERT)
     {
-      ROS_WARN_STREAM("=> cbWaypointList: INSERT is not yet implemented, APPENDING waypoints");
-      // todo modify iterator accordingly here
+//      ROS_WARN_STREAM("=> cbWaypointList: INSERT is not yet implemented, APPENDING waypoints");
+      // set iterator to idx or end if idx>size
+      it_cur_wp =
+          msg->idx < waypoint_list_.size() ? waypoint_list_.begin() + msg->idx : waypoint_list_.end();
     }
 
     // "insert" vector
