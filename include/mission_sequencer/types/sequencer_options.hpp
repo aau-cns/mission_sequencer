@@ -61,10 +61,14 @@ struct MissionSequencerOptions
   std::string filename_wps_{ "" };
 
   /// maximum boundary for new waypoints (w.r.t. starting pose or global)
-  Eigen::Vector3d bound_max_{ 1.0, 1.0, 1.0 };
+  /// Note (alf): Eigen::Array3d instead of Eigen::Vector3d to allow component-wise operations
+  //Eigen::Vector3d bound_max_{ 1.0, 1.0, 1.0 };
+  Eigen::Array3d bound_max_{ 1.0, 1.0, 1.0 };
 
   /// minimum boundary for new waypoints (w.r.t. starting pose or global)
-  Eigen::Vector3d bound_min_{ -1.0, -1.0, 0.0 };
+  /// Note (alf): Eigen::Array3d instead of Eigen::Vector3d to allow component-wise operations
+  //Eigen::Vector3d bound_min_{ -1.0, -1.0, 0.0 };
+  Eigen::Array3d bound_min_{ -1.0, -1.0, 0.0 };
 
   /// reference frame of boundary
   BoundReference bound_ref_{ BoundReference::GLOBAL };

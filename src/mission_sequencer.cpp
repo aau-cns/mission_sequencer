@@ -774,11 +774,18 @@ void MissionSequencer::performMission()
     geometry_msgs::PoseStamped next_wp = waypointToPoseStamped(waypoint_list_[0]);
     /// \todo TODO(scm): make this check part of the WP callback, such that it is not checked at the check rate, i.e.
     /// 20Hz
+
     // check if waypoint is within boundaries
-    Eigen::Vector3d cur_pos =
-        Eigen::Vector3d(next_wp.pose.position.x, next_wp.pose.position.y, next_wp.pose.position.z);
-    Eigen::Vector3d calc_min = cur_pos;
-    Eigen::Vector3d calc_max = -cur_pos;
+    //Eigen::Vector3d cur_pos =
+    //    Eigen::Vector3d(next_wp.pose.position.x, next_wp.pose.position.y, next_wp.pose.position.z);
+    //Eigen::Vector3d calc_min = cur_pos;
+    //Eigen::Vector3d calc_max = -cur_pos;
+
+    // check if waypoint is within boundaries
+    /// \todo TODO(alf): rename cur_pos to next_waypoint, cur_pos it's misleading!
+    Eigen::Array3d cur_pos = Eigen::Array3d(next_wp.pose.position.x, next_wp.pose.position.y, next_wp.pose.position.z);
+    Eigen::Array3d calc_min = cur_pos;
+    Eigen::Array3d calc_max = -cur_pos;
 
     switch (sequencer_params_.bound_ref_)
     {
@@ -788,8 +795,11 @@ void MissionSequencer::performMission()
         break;
       }
       case MissionSequencerOptions::BoundReference::LOCAL: {
-        Eigen::Vector3d start_pos(starting_vehicle_pose_.pose.position.x, starting_vehicle_pose_.pose.position.y,
-                                  starting_vehicle_pose_.pose.position.z);
+        //Eigen::Vector3d start_pos(starting_vehicle_pose_.pose.position.x, starting_vehicle_pose_.pose.position.y,
+        //                          starting_vehicle_pose_.pose.position.z);
+        Eigen::Array3d start_pos(starting_vehicle_pose_.pose.position.x, starting_vehicle_pose_.pose.position.y,
+                                 starting_vehicle_pose_.pose.position.z);
+        // Component-wise opertaion
         calc_min -= (sequencer_params_.bound_min_ + start_pos);
         calc_max += (sequencer_params_.bound_max_ + start_pos);
         break;
