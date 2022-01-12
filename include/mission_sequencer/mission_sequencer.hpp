@@ -36,6 +36,7 @@
 #include <mavros_msgs/CommandLong.h>
 #include <mavros_msgs/CommandTOL.h>
 #include <mavros_msgs/SetMode.h>
+#include <mission_sequencer/GetStartPose.h>
 
 // Waypoint list
 #include "parse_waypoints.hpp"
@@ -143,6 +144,10 @@ private:
   ros::ServiceClient srv_mavros_land_;      //!< ROS service client to the 'land' mavros interface
   ros::ServiceClient srv_mavros_set_mode_;  //!< ROS service client to the 'set mode' mavros interface
 
+  // ROS Service Servers
+  ros::ServiceServer srv_get_start_pose_;
+  ros::ServiceServer srv_get_waypoint_list_;
+
   // ROS METHODS
 private:
   ///
@@ -182,6 +187,9 @@ private:
   /// \todo TODO(scm): implement the insert functionality
   ///
   void cbWaypointList(const mission_sequencer::MissionWaypointArrayConstPtr& msg);
+
+  bool srvGetStartPose(const mission_sequencer::GetStartPose::Request& req,
+                       mission_sequencer::GetStartPose::Response& res);
 
   ///
   /// \brief publishResponse publishes the reponse to a mission request onto the ROS network
@@ -223,13 +231,13 @@ private:
   void performAbort();
 
 private:
-  bool b_pose_is_valid_{ false };         //!< flag to determine if a valid pose has been received
-  bool b_state_is_valid_{ false };        //!< flag to determine if a valid mavros state has been received
-  bool b_extstate_is_valid_{ false };     //!< flag to determine if a valid extended mavros state has been received
-  bool b_executed_landing_{ false };      //!< flag to determine if a landing command has been executed
-  bool b_is_landed_{ true };              //!< flag to determine if the vehicle has landed
-  bool b_do_auto_state_change_{ false };  //!< \deprecated flag to determine if state changes should happen
-                                          //!< automatically or per request
+  bool b_pose_is_valid_{ false };            //!< flag to determine if a valid pose has been received
+  bool b_state_is_valid_{ false };           //!< flag to determine if a valid mavros state has been received
+  bool b_extstate_is_valid_{ false };        //!< flag to determine if a valid extended mavros state has been received
+  bool b_executed_landing_{ false };         //!< flag to determine if a landing command has been executed
+  bool b_is_landed_{ true };                 //!< flag to determine if the vehicle has landed
+  bool b_do_auto_state_change_{ false };     //!< \deprecated flag to determine if state changes should happen
+                                             //!< automatically or per request
   bool b_do_automatically_land_{ false };    //!< \deprecated flag to determine if vehicle should automatically land
   bool b_do_automatically_disarm_{ false };  //!< \deprecated flag to deterime if vehicle should be automatically
                                              //!< disarmed

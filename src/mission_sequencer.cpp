@@ -543,10 +543,9 @@ void MissionSequencer::cbWaypointList(const mission_sequencer::MissionWaypointAr
     std::vector<ParseWaypoint::Waypoint>::iterator it_cur_wp = waypoint_list_.end();
     if (msg->action == mission_sequencer::MissionWaypointArray::INSERT)
     {
-//      ROS_WARN_STREAM("=> cbWaypointList: INSERT is not yet implemented, APPENDING waypoints");
+      //      ROS_WARN_STREAM("=> cbWaypointList: INSERT is not yet implemented, APPENDING waypoints");
       // set iterator to idx or end if idx>size
-      it_cur_wp =
-          msg->idx < waypoint_list_.size() ? waypoint_list_.begin() + msg->idx : waypoint_list_.end();
+      it_cur_wp = msg->idx < waypoint_list_.size() ? waypoint_list_.begin() + msg->idx : waypoint_list_.end();
     }
 
     // "insert" vector
@@ -557,6 +556,46 @@ void MissionSequencer::cbWaypointList(const mission_sequencer::MissionWaypointAr
   ROS_DEBUG_STREAM("=> cbWaypointList:\n"
                    << "\tAdded " << new_waypoints.size() << " WPs\n"
                    << "\tHave  " << waypoint_list_.size() << " WPs");
+}
+
+bool MissionSequencer::srvGetStartPose(const mission_sequencer::GetStartPose::Request& /*req*/,
+                                       mission_sequencer::GetStartPose::Response& res)
+{
+  // check if we have received a valid pose yet
+  /// \todo TODO(scm): maybe also check if we are at least armed, because otherwise we do not have a 'valid' starting pose
+  if (!b_pose_is_valid_)
+    return false;
+
+  // set message header
+  res.header.stamp = mavros_cmds_.time_arm_request;
+  res.header.frame_id = "global";
+
+  /// \todo TODO(scm): simplify variable type usage for poses, and add parser!
+  if (sequencer_params_.b_wp_are_relative_)
+  {
+    res.start_wp.x = starting_vehicle_pose_.pose.position.x;
+    res.start_wp.y = starting_vehicle_pose_.pose.position.y;
+    res.start_wp.z = starting_vehicle_pose_.pose.position.z;
+
+    // derive starting quaternion
+    tf2::Quaternion startingQuaternion(
+        starting_vehicle_pose_.pose.orientation.x, starting_vehicle_pose_.pose.orientation.y,
+        starting_vehicle_pose_.pose.orientation.z, starting_vehicle_pose_.pose.orientation.w);
+
+    double startingYaw, startingPitch, startingRoll;
+    tf2::Matrix3x3(startingQuaternion).getEulerYPR(startingYaw, startingPitch, startingRoll);
+
+    res.start_wp.yaw = startingYaw;
+  }
+  else
+  {
+    res.start_wp.x = 0;
+    res.start_wp.y = 0;
+    res.start_wp.z = 0;
+    res.start_wp.yaw = 0;
+  }
+
+  return true;
 }
 
 void MissionSequencer::publishResponse(const uint8_t& id, const uint8_t& request, const bool& response,
@@ -669,7 +708,7 @@ void MissionSequencer::publishPoseSetpoint(void)
     setpoint_vehicle_pose_.header.stamp = pub_time;
     pub_pose_setpoint_.publish(setpoint_vehicle_pose_);
 
-    /// \todo make this function part of the parser
+    /// \todo TODO(scm): make this function part of the parser
     // publish waypoint list
     MissionWaypointArray wps_msg;
     wps_msg.waypoints.clear();
@@ -776,10 +815,10 @@ void MissionSequencer::performMission()
     /// 20Hz
 
     // check if waypoint is within boundaries
-    //Eigen::Vector3d cur_pos =
+    // Eigen::Vector3d cur_pos =
     //    Eigen::Vector3d(next_wp.pose.position.x, next_wp.pose.position.y, next_wp.pose.position.z);
-    //Eigen::Vector3d calc_min = cur_pos;
-    //Eigen::Vector3d calc_max = -cur_pos;
+    // Eigen::Vector3d calc_min = cur_pos;
+    // Eigen::Vector3d calc_max = -cur_pos;
 
     // check if waypoint is within boundaries
     /// \todo TODO(alf): rename cur_pos to next_waypoint, cur_pos it's misleading!
@@ -795,7 +834,7 @@ void MissionSequencer::performMission()
         break;
       }
       case MissionSequencerOptions::BoundReference::LOCAL: {
-        //Eigen::Vector3d start_pos(starting_vehicle_pose_.pose.position.x, starting_vehicle_pose_.pose.position.y,
+        // Eigen::Vector3d start_pos(starting_vehicle_pose_.pose.position.x, starting_vehicle_pose_.pose.position.y,
         //                          starting_vehicle_pose_.pose.position.z);
         Eigen::Array3d start_pos(starting_vehicle_pose_.pose.position.x, starting_vehicle_pose_.pose.position.y,
                                  starting_vehicle_pose_.pose.position.z);
