@@ -188,7 +188,7 @@ private:
   ///
   void cbWaypointList(const mission_sequencer::MissionWaypointArrayConstPtr& msg);
 
-  bool srvGetStartPose(const mission_sequencer::GetStartPose::Request& req,
+  bool srvGetStartPose(GetStartPose::Request &req,
                        mission_sequencer::GetStartPose::Response& res);
 
   ///

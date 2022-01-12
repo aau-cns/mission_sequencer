@@ -86,6 +86,9 @@ MissionSequencer::MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh)
   srv_mavros_land_ = nh_.serviceClient<mavros_msgs::CommandTOL>(sequencer_params_.srv_cmd_land_);
   srv_mavros_set_mode_ = nh_.serviceClient<mavros_msgs::SetMode>(sequencer_params_.srv_cmd_set_mode_);
 
+  // setup ROS service servers
+  srv_get_start_pose_ = pnh_.advertiseService("getStartPose", &MissionSequencer::srvGetStartPose, this);
+
   // set waypoints, if required
   if (sequencer_params_.b_wp_from_file_)
     setFilename(sequencer_params_.filename_wps_);
@@ -558,7 +561,7 @@ void MissionSequencer::cbWaypointList(const mission_sequencer::MissionWaypointAr
                    << "\tHave  " << waypoint_list_.size() << " WPs");
 }
 
-bool MissionSequencer::srvGetStartPose(const mission_sequencer::GetStartPose::Request& /*req*/,
+bool MissionSequencer::srvGetStartPose(mission_sequencer::GetStartPose::Request& /*req*/,
                                        mission_sequencer::GetStartPose::Response& res)
 {
   // check if we have received a valid pose yet
