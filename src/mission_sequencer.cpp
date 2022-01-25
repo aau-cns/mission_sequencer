@@ -1228,6 +1228,8 @@ bool MissionSequencer::checkStateChange(const SequencerState new_state) const
         else if (previous_sequencer_state_ == SequencerState::TAKEOFF)
           return true;
       }
+      else if (new_state == SequencerState::LAND)
+        return true;
       break;
 
     case SequencerState::LAND:
