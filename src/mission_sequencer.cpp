@@ -242,7 +242,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
   {
       // arming, no takeoff
     case mission_sequencer::MissionRequest::ARM: {
-      ROS_DEBUG_STREAM("* mission_sequencer::request::ARM...");
+      ROS_INFO_STREAM("* mission_sequencer::request::ARM...");
       if (checkStateChange(SequencerState::ARM) && b_pose_is_valid_ && b_state_is_valid_ && b_extstate_is_valid_)
       {
         // Set initial pose
@@ -260,7 +260,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       }
       else
       {
-        ROS_WARN_STREAM("* mission_sequencer::request::ARM - failed! mavros communication or PREARM error!");
+        ROS_ERROR_STREAM("* mission_sequencer::request::ARM - failed! mavros communication or PREARM error!");
         ROS_WARN_STREAM("*   Valids: Pose=" << b_pose_is_valid_ << ", State=" << b_state_is_valid_
                                             << ", extState=" << b_extstate_is_valid_);
 
@@ -298,19 +298,19 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
         }
         else
         {
-          ROS_ERROR_STREAM("=> TakeoffType not implemented");
+          ROS_FATAL_STREAM("=> TakeoffType not implemented");
         }
       }
       else
       {
-        ROS_WARN_STREAM("* mission_sequencer::request::TAKEOFF - failed! Probably not armed.");
+        ROS_ERROR_STREAM("* mission_sequencer::request::TAKEOFF - failed! Probably not armed.");
         b_wrong_input = true;
       }
       break;
     }
 
     case mission_sequencer::MissionRequest::HOLD: {
-      ROS_DEBUG_STREAM("* mission_sequencer::request::HOLD...");
+      ROS_WARN_STREAM("* mission_sequencer::request::HOLD...");
       // check if change is approved
       if (checkStateChange(SequencerState::HOLD))
       {
@@ -333,7 +333,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       }
       else
       {
-        ROS_WARN_STREAM("* mission_sequencer::request::HOLD - failed! Not in MISSION!");
+        ROS_ERROR_STREAM("* mission_sequencer::request::HOLD - failed! Not in MISSION!");
         b_wrong_input = true;
       }
       break;
@@ -357,7 +357,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       {
         if (b_do_verbose_)
         {
-          ROS_WARN_STREAM("* mission_sequencer::request::RESUME - failed! Not in HOLD!");
+          ROS_ERROR_STREAM("* mission_sequencer::request::RESUME - failed! Not in HOLD!");
         }
         b_wrong_input = true;
       }
@@ -380,7 +380,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       else
       {
         // wrong input - probably due to being in dis/armed or idle state
-        ROS_WARN_STREAM("* mission_sequencer::request::LAND - failed! Not in above ground state.");
+        ROS_ERROR_STREAM("* mission_sequencer::request::LAND - failed! Not in above ground state.");
         b_wrong_input = true;
       }
       break;
@@ -405,7 +405,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       }
       else
       {
-        ROS_WARN_STREAM("* mission_sequencer::request::HOVER - failed!");
+        ROS_ERROR_STREAM("* mission_sequencer::request::HOVER - failed!");
         b_wrong_input = true;
       }
       break;
@@ -891,7 +891,7 @@ void MissionSequencer::performMission()
     // check for automatic transition to land state
     if (sequencer_params_.b_do_automatically_land_)
     {
-      ROS_ERROR_STREAM("* automatical landing NOT YET IMPLEMENTED");
+      ROS_FATAL_STREAM("* automatical landing NOT YET IMPLEMENTED");
     }
 
     // publish mission completion
@@ -1234,10 +1234,15 @@ bool MissionSequencer::checkStateChange(const SequencerState new_state) const
 
     case SequencerState::LAND:
       // LAND -> request(DISARM) -> DISARM
+      // LAND -> request(LAND) -> warning + LAND
       if (new_state == SequencerState::DISARM)
         return true;
       else if (new_state == SequencerState::HOLD)
         return true;
+      else if (new_state == SequencerState::LAND)
+      {
+        ROS_WARN_STREAM("* mission_sequencer::request::LAND LAND requested although already in LAND state...");
+      }
       break;
 
     case SequencerState::DISARM:
