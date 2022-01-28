@@ -14,7 +14,7 @@ endif()
 # Target name
 #
 
-set(target api-docs)
+set(target pkg-docs)
 message(STATUS "Doc ${target}")
 
 
@@ -41,11 +41,11 @@ if(NOT path)
     set(path ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 
-message(STATUS "doc path ${path}")
-message(STATUS "doc cur source dir ${CMAKE_CURRENT_SOURCE_DIR}")
+# message(STATUS "doc path ${path}")
+# message(STATUS "doc cur source dir ${CMAKE_CURRENT_SOURCE_DIR}")
 
 # Configure doxyfile (if it is a real doxyfile already, it should simply copy the file)
-set(DOXYGEN_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+set(DOXYGEN_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 configure_file(${doxyfile_in} ${doxyfile} @ONLY)
 
 # Invoke doxygen
