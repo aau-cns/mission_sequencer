@@ -60,17 +60,19 @@ MissionSequencer::MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh)
   filenames_ = std::vector<std::string>(0);
 
   // setup ROS subscribers
-  sub_vehicle_state_ = nh.subscribe("/mavros/state", 10, &MissionSequencer::cbVehicleState, this);
-  sub_extended_vehicle_state_ =
-      nh.subscribe("/mavros/extended_state", 10, &MissionSequencer::cbExtendedVehicleState, this);
-  sub_vehicle_pose_ = nh.subscribe("/mavros/local_position/pose", 10, &MissionSequencer::cbPose, this);
-  sub_ms_request_ = nh.subscribe("/autonomy/request", 10, &MissionSequencer::cbMSRequest, this);
+  //  sub_vehicle_state_ = nh.subscribe("/mavros/state", 10, &MissionSequencer::cbVehicleState, this);
+  //  sub_extended_vehicle_state_ =
+  //      nh.subscribe("/mavros/extended_state", 10, &MissionSequencer::cbExtendedVehicleState, this);
+  //  sub_vehicle_pose_ = nh.subscribe("/mavros/local_position/pose", 10, &MissionSequencer::cbPose, this);
+  //  sub_ms_request_ = nh.subscribe("/autonomy/request", 10, &MissionSequencer::cbMSRequest, this);
 
   // setup ROS subscribers (relative to node's namespace)
   sub_vehicle_state_ = nh_.subscribe("mavros/state", 10, &MissionSequencer::cbVehicleState, this);
   sub_extended_vehicle_state_ =
       nh_.subscribe("mavros/extended_state", 10, &MissionSequencer::cbExtendedVehicleState, this);
   sub_vehicle_pose_ = nh_.subscribe("mavros/local_position/pose", 10, &MissionSequencer::cbPose, this);
+  sub_vehicle_pose_ = nh_.subscribe("mavros/local_position/odom", 1, &MissionSequencer::cbOdom, this,
+                                    ros::TransportHints().tcpNoDelay(true));
   sub_ms_request_ = nh_.subscribe("autonomy/request", 10, &MissionSequencer::cbMSRequest, this);
   sub_waypoint_file_name_ = pnh_.subscribe("waypoint_filename", 10, &MissionSequencer::cbWaypointFilename, this);
   sub_waypoint_list_ = pnh_.subscribe("waypoint_list", 10, &MissionSequencer::cbWaypointList, this);
@@ -112,12 +114,38 @@ void MissionSequencer::cbExtendedVehicleState(const mavros_msgs::ExtendedState::
 
 void MissionSequencer::cbPose(const geometry_msgs::PoseStamped::ConstPtr& msg)
 {
+  // call update pose
+  updatePose(*msg);
+};
+
+void MissionSequencer::cbOdom(const nav_msgs::Odometry::ConstPtr& msg)
+{
+  // update pose
+  geometry_msgs::PoseStamped pose;
+  pose.pose = msg->pose.pose;
+  pose.header = msg->header;
+  updatePose(pose);
+
+  // update velocity
+  geometry_msgs::TwistStamped twist;
+  twist.twist = msg->twist.twist;
+  twist.header = msg->header;
+
+  // update current vehicle velocity
+  current_vehicle_twist_ = twist;
+
+  // update validity
+  b_odom_is_valid_ = true;
+}
+
+void MissionSequencer::updatePose(const geometry_msgs::PoseStamped& pose)
+{
   // check if starting position has been determined, i.e. the current pose is valid and MS is in IDLE
 
   if (!b_pose_is_valid_ || (current_sequencer_state_ == SequencerState::IDLE))
   {
     /// \todo make this to Eigen variable
-    starting_vehicle_pose_ = *msg;
+    starting_vehicle_pose_ = pose;
 
     /// \footnote this had been developed by RJ, needs to be clarified why this is needed
     /// \todo clarify conversion from ENU to NED
@@ -156,8 +184,8 @@ void MissionSequencer::cbPose(const geometry_msgs::PoseStamped::ConstPtr& msg)
   }
 
   // update the current vehicle pose
-  current_vehicle_pose_ = *msg;
-};
+  current_vehicle_pose_ = pose;
+}
 
 bool MissionSequencer::getFilenames()
 {
@@ -324,6 +352,11 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
                         << "  x = " << setpoint_vehicle_pose_.pose.position.x
                         << ", y = " << setpoint_vehicle_pose_.pose.position.y
                         << ", z = " << setpoint_vehicle_pose_.pose.position.z);
+
+        // updating velocity reached
+        current_vel_reached_[0] = false;
+        current_vel_reached_[1] = false;
+        current_vel_reached_[2] = false;
 
         // transition to new state
         current_sequencer_state_ = SequencerState::HOLD;
@@ -565,7 +598,8 @@ bool MissionSequencer::srvGetStartPose(mission_sequencer::GetStartPose::Request&
                                        mission_sequencer::GetStartPose::Response& res)
 {
   // check if we have received a valid pose yet
-  /// \todo TODO(scm): maybe also check if we are at least armed, because otherwise we do not have a 'valid' starting pose
+  /// \todo TODO(scm): maybe also check if we are at least armed, because otherwise we do not have a 'valid' starting
+  /// pose
   if (!b_pose_is_valid_)
     return false;
 
@@ -1044,6 +1078,16 @@ void MissionSequencer::performLand()
 void MissionSequencer::performHold()
 {
   ROS_DEBUG_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_, "* SequencerState::HOLD");
+
+  if (sequencer_params_.b_hold_zero_vel_)
+  {
+    geometry_msgs::TwistStamped set_vel;
+    set_vel.twist.linear.x = 0.0;
+    set_vel.twist.linear.y = 0.0;
+    set_vel.twist.linear.z = 0.0;
+    if (checkVelocity(set_vel))
+      ROS_DEBUG_STREAM_THROTTLE(0.5 * sequencer_params_.topic_debug_interval_, " =>  Halted vehicle.");
+  }
 }
 
 void MissionSequencer::performDisarming()
@@ -1145,6 +1189,68 @@ bool MissionSequencer::checkWaypoint(const geometry_msgs::PoseStamped& current_w
 
   // waypoint not reached --> return fals
   return false;
+}
+
+bool MissionSequencer::checkVelocity(const geometry_msgs::TwistStamped& set_velocity)
+{
+  // check if velocity is valid
+  if (!b_odom_is_valid_)
+  {
+    ROS_WARN_STREAM_THROTTLE(0.5 * sequencer_params_.topic_debug_interval_,
+                             " ->  Cannot check for velocity, velocity not yet valid!");
+    return false;
+  }
+
+  ROS_DEBUG_STREAM_THROTTLE(0.5 * sequencer_params_.topic_debug_interval_,
+                            "-   set_vel:       " << set_velocity.twist.linear);
+  ROS_DEBUG_STREAM_THROTTLE(0.5 * sequencer_params_.topic_debug_interval_,
+                            "-   velocity:      " << current_vehicle_twist_.twist.linear);
+
+  Eigen::Vector3d diff(std::fabs(current_vehicle_twist_.twist.linear.x - set_velocity.twist.linear.x),
+                       std::fabs(current_vehicle_twist_.twist.linear.y - set_velocity.twist.linear.y),
+                       std::fabs(current_vehicle_twist_.twist.linear.z - set_velocity.twist.linear.z));
+
+  /// \todo TODO(scm): once Eigen is used this can be nicer coded
+  // if (!current_vel_reached_[axis] && diff[axis] < sequencer_params_.threshold_velocity_)
+  // setpoint_hveicle_pose.position[axis] = ...
+
+  bool vel_reached = true;
+
+  // check for x
+  if (!current_vel_reached_[0] && diff[0] < sequencer_params_.threshold_velocity_)
+  {
+    // update waypoint to current position
+    setpoint_vehicle_pose_.pose.position.x = current_vehicle_pose_.pose.position.x;
+    current_vel_reached_[0] = true;
+    ROS_INFO_STREAM("Reached Velocity: x = " << set_velocity.twist.linear.x
+                                             << "=> Set waypoint: x = " << setpoint_vehicle_pose_.pose.position.x);
+  }
+  else
+    vel_reached &= current_vel_reached_[0];
+  // check for y
+  if (!current_vel_reached_[1] && diff[1] < sequencer_params_.threshold_velocity_)
+  {
+    // update waypoint to current position
+    setpoint_vehicle_pose_.pose.position.y = current_vehicle_pose_.pose.position.y;
+    current_vel_reached_[1] = true;
+    ROS_INFO_STREAM("Reached Velocity: y = " << set_velocity.twist.linear.y
+                                             << "=> Set waypoint: y = " << setpoint_vehicle_pose_.pose.position.y);
+  }
+  else
+    vel_reached &= current_vel_reached_[1];
+  // check for z
+  if (!current_vel_reached_[2] && diff[2] < sequencer_params_.threshold_velocity_)
+  {
+    // update waypoint to current position
+    setpoint_vehicle_pose_.pose.position.z = current_vehicle_pose_.pose.position.z;
+    current_vel_reached_[2] = true;
+    ROS_INFO_STREAM("Reached Velocity: z = " << set_velocity.twist.linear.z
+                                             << "=> Set waypoint: z = " << setpoint_vehicle_pose_.pose.position.z);
+  }
+  else
+    vel_reached &= current_vel_reached_[2];
+
+  return vel_reached;
 }
 
 bool MissionSequencer::checkStateChange(const SequencerState new_state) const

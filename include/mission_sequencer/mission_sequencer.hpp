@@ -22,9 +22,11 @@
 
 // Include Subscriber Messages
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/TwistStamped.h>
 #include <mavros_msgs/ExtendedState.h>
 #include <mavros_msgs/State.h>
 #include <mission_sequencer/MissionRequest.h>
+#include <nav_msgs/Odometry.h>
 
 // Include Publisher Messages
 #include <mission_sequencer/MissionResponse.h>
@@ -171,6 +173,15 @@ private:
   ///
   void cbPose(const geometry_msgs::PoseStamped::ConstPtr& msg);
 
+  ///
+  /// \brief cbOdom ROS topic callback for the current vehicle odometry
+  /// \param msg curren vehicle odometry in the 'global' navigation frame
+  ///
+  /// This callback sets the current vehicle pose and velocity used for checking waypoint reached in the mission phase.
+  /// The first time this function is called the starting_vehicle_pose_ is set to the received pose.
+  ///
+  void cbOdom(const nav_msgs::Odometry::ConstPtr& msg);
+
   void cbMSRequest(const mission_sequencer::MissionRequest::ConstPtr& msg);
   void cbWaypointFilename(const std_msgs::String::ConstPtr& msg);
 
@@ -188,8 +199,7 @@ private:
   ///
   void cbWaypointList(const mission_sequencer::MissionWaypointArrayConstPtr& msg);
 
-  bool srvGetStartPose(GetStartPose::Request &req,
-                       mission_sequencer::GetStartPose::Response& res);
+  bool srvGetStartPose(GetStartPose::Request& req, mission_sequencer::GetStartPose::Response& res);
 
   ///
   /// \brief publishResponse publishes the reponse to a mission request onto the ROS network
@@ -230,8 +240,11 @@ private:
   void performDisarming();
   void performAbort();
 
+  void updatePose(const geometry_msgs::PoseStamped& pose);
+
 private:
   bool b_pose_is_valid_{ false };            //!< flag to determine if a valid pose has been received
+  bool b_odom_is_valid_{ false };            //!< flag to determine if a valid pose has been received
   bool b_state_is_valid_{ false };           //!< flag to determine if a valid mavros state has been received
   bool b_extstate_is_valid_{ false };        //!< flag to determine if a valid extended mavros state has been received
   bool b_executed_landing_{ false };         //!< flag to determine if a landing command has been executed
@@ -254,10 +267,12 @@ private:
 
   // navigation variables
 private:
-  geometry_msgs::PoseStamped starting_vehicle_pose_;  //!< determines the start pose of the vehicle
-  geometry_msgs::PoseStamped current_vehicle_pose_;   //!< determines the current pose of the vehicle
-  geometry_msgs::PoseStamped setpoint_vehicle_pose_;  //!< determines the setpoint (goal) pose of the vehicle
-  geometry_msgs::PoseStamped setpoint_takeoff_pose_;  //!< determines the setpoint (goal) pose for takeoff
+  geometry_msgs::PoseStamped starting_vehicle_pose_;   //!< determines the start pose of the vehicle
+  geometry_msgs::PoseStamped current_vehicle_pose_;    //!< determines the current pose of the vehicle
+  geometry_msgs::PoseStamped setpoint_vehicle_pose_;   //!< determines the setpoint (goal) pose of the vehicle
+  geometry_msgs::PoseStamped setpoint_takeoff_pose_;   //!< determines the setpoint (goal) pose for takeoff
+  geometry_msgs::TwistStamped current_vehicle_twist_;  //!< determines the current velocity of the vehicle
+  bool current_vel_reached_[3] = { false, false, false };
 
   mavros_msgs::State current_vehicle_state_;              //!< determines the current vehicle mavros state
   mavros_msgs::ExtendedState current_vehicle_ext_state_;  //!< determines the current vehcile extended mavros state
@@ -287,6 +302,7 @@ private:
   // METHODS TO CHECK TRANSITIONS, IDS, STATES, ETC.
 private:
   bool checkWaypoint(const geometry_msgs::PoseStamped& current_waypoint);
+  bool checkVelocity(const geometry_msgs::TwistStamped& set_velocity);
   bool checkStateChange(const SequencerState new_state) const;
 
   ///

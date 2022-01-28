@@ -29,7 +29,7 @@ struct MissionSequencerOptions
 
   friend inline std::ostream& operator<<(std::ostream& os, BoundReference ref)
   {
-    switch(ref)
+    switch (ref)
     {
       case BoundReference::GLOBAL:
         return os << "GLOBAL";
@@ -48,6 +48,9 @@ struct MissionSequencerOptions
   /// threshold in yaw (attitude) to determine if waypoint was reached in radian
   double threshold_yaw_{ 0.1 };
 
+  /// threshold in velocity to determine if velocity was reached in meters per second
+  double threshold_velocity_{ 0.1 };
+
   /// type of takeoff to use
   /// \warning TakeoffType::VELOCITY has no takeoff implementation yet
   TakeoffType takeoff_type_{ TakeoffType::POSITION };
@@ -62,12 +65,12 @@ struct MissionSequencerOptions
 
   /// maximum boundary for new waypoints (w.r.t. starting pose or global)
   /// Note (alf): Eigen::Array3d instead of Eigen::Vector3d to allow component-wise operations
-  //Eigen::Vector3d bound_max_{ 1.0, 1.0, 1.0 };
+  // Eigen::Vector3d bound_max_{ 1.0, 1.0, 1.0 };
   Eigen::Array3d bound_max_{ 1.0, 1.0, 1.0 };
 
   /// minimum boundary for new waypoints (w.r.t. starting pose or global)
   /// Note (alf): Eigen::Array3d instead of Eigen::Vector3d to allow component-wise operations
-  //Eigen::Vector3d bound_min_{ -1.0, -1.0, 0.0 };
+  // Eigen::Vector3d bound_min_{ -1.0, -1.0, 0.0 };
   Eigen::Array3d bound_min_{ -1.0, -1.0, 0.0 };
 
   /// reference frame of boundary
@@ -78,6 +81,7 @@ struct MissionSequencerOptions
     ROS_INFO_STREAM("==> sequencer_options: Parameter Summary -- Navigation");
     ROS_INFO_STREAM("\t- threshold_position_:         " << threshold_position_);
     ROS_INFO_STREAM("\t- threshold_yaw_:              " << threshold_yaw_);
+    ROS_INFO_STREAM("\t- threshold_velocity_:         " << threshold_velocity_);
     ROS_INFO_STREAM("\t- takeoff_type_:               " << takeoff_type_);
     ROS_INFO_STREAM("\t- takeoff_z_:                  " << takeoff_z_);
     ROS_INFO_STREAM("\t- filename_wps_:               " << filename_wps_);
@@ -109,6 +113,10 @@ struct MissionSequencerOptions
   /// this requires filname_wps_ to include a filename or transmition of file parameters through the file topic
   bool b_wp_from_file_{ false };
 
+  /// flag to determine if a hold command should update the waypoint to current position once velocity has been reduced
+  /// to approx 0m/s
+  bool b_hold_zero_vel_{ true };
+
   /// flag to determine if additional verbose output is turned on
   /// \deprecated this will be removed and switched to ROS_DEBUG_STREAM for verbose output
   bool b_do_verbose{ false };
@@ -121,6 +129,7 @@ struct MissionSequencerOptions
     ROS_INFO_STREAM("\t- b_do_automatically_disarm_:  " << b_do_automatically_disarm_);
     ROS_INFO_STREAM("\t- b_wp_are_relative_:          " << b_wp_are_relative_);
     ROS_INFO_STREAM("\t- b_wp_from_file_:             " << b_wp_from_file_);
+    ROS_INFO_STREAM("\t- b_hold_zero_vel_:            " << b_hold_zero_vel_);
     ROS_INFO_STREAM("\t- b_do_verbose:                " << b_do_verbose);
   }
 
