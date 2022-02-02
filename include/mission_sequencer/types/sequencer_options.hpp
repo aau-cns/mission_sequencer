@@ -148,6 +148,9 @@ struct MissionSequencerOptions
   /// ROS service used to set the mission mode
   std::string srv_cmd_set_mode_{ "/mavros/set_mode" };
 
+  std::string topic_ref_pose_{ "ref/pose" };
+  std::string topic_ref_odom_{ "ref/odom" };
+
   inline void printROS()
   {
     ROS_INFO_STREAM("==> sequencer_options: Parameter Summary -- ROS");
@@ -155,6 +158,8 @@ struct MissionSequencerOptions
     ROS_INFO_STREAM("\t- srv_cmd_command_:            " << srv_cmd_command_);
     ROS_INFO_STREAM("\t- srv_cmd_land_:               " << srv_cmd_land_);
     ROS_INFO_STREAM("\t- srv_cmd_set_mode_:           " << srv_cmd_set_mode_);
+    ROS_INFO_STREAM("\t- topic_ref_pose_:             " << topic_ref_pose_);
+    ROS_INFO_STREAM("\t- topic_ref_odom_:             " << topic_ref_odom_);
   }
 
   // ==========================================================================

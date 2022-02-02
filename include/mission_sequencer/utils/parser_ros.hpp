@@ -98,6 +98,14 @@ MissionSequencerOptions parse_ros_nodehandle(ros::NodeHandle& nh)
 
   params.printSequencer();
 
+  // ==========================================================================
+  // ROS OPTIONS ==============================================================
+
+  nh.param<std::string>("topic_in_pose", params.topic_ref_pose_, params.topic_ref_pose_);
+  nh.param<std::string>("topic_in_odom", params.topic_ref_odom_, params.topic_ref_odom_);
+
+  params.printROS();
+
   return params;
 };  // class ParserROS
 }  // namespace mission_sequencer
