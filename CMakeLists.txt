@@ -170,6 +170,7 @@ set(headers
     ${include_path}/types/sequencer_types.hpp
     ${include_path}/types/sequencer_options.hpp
     ${include_path}/utils/message_conversion.hpp
+    ${include_path}/utils/parser_ros.hpp
     ${include_path}/parse_waypoints.hpp
     ${include_path}/mission_sequencer.hpp
 )

@@ -117,6 +117,10 @@ struct MissionSequencerOptions
   /// to approx 0m/s
   bool b_hold_zero_vel_{ true };
 
+  /// flag to determine if the hold waypoint should be predicted based on the current velocity with a maximum breaking
+  /// speed of 1m/s
+  bool b_predict_hold_wp_{ false };
+
   /// flag to determine if additional verbose output is turned on
   /// \deprecated this will be removed and switched to ROS_DEBUG_STREAM for verbose output
   bool b_do_verbose{ false };
@@ -130,6 +134,7 @@ struct MissionSequencerOptions
     ROS_INFO_STREAM("\t- b_wp_are_relative_:          " << b_wp_are_relative_);
     ROS_INFO_STREAM("\t- b_wp_from_file_:             " << b_wp_from_file_);
     ROS_INFO_STREAM("\t- b_hold_zero_vel_:            " << b_hold_zero_vel_);
+    ROS_INFO_STREAM("\t- b_predict_hold_wp_:          " << b_predict_hold_wp_);
     ROS_INFO_STREAM("\t- b_do_verbose:                " << b_do_verbose);
   }
 

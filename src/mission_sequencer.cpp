@@ -15,6 +15,18 @@
 #include "utils/message_conversion.hpp"
 #include "utils/parser_ros.hpp"
 
+namespace std
+{
+///
+/// \see https://stackoverflow.com/a/4609795
+///
+template <typename T>
+int sgn(T val)
+{
+  return (T(0) < val) - (val < T(0));
+}
+}  // namespace std
+
 namespace mission_sequencer
 {
 double warp_to_pi(double const angle_rad)
@@ -348,6 +360,17 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
 
         // set holding position
         setpoint_vehicle_pose_ = current_vehicle_pose_;
+        // predict waypoint based on current velocity
+        if (sequencer_params_.b_predict_hold_wp_ && b_odom_is_valid_)
+        {
+          // calculate position with max decelaration of -1.0m/s^2 per axis
+          setpoint_vehicle_pose_.pose.position.x +=
+              0.5 * current_vehicle_twist_.twist.linear.x * std::fabs(current_vehicle_twist_.twist.linear.x) / 1.0;
+          setpoint_vehicle_pose_.pose.position.y +=
+              0.5 * current_vehicle_twist_.twist.linear.y * std::fabs(current_vehicle_twist_.twist.linear.y) / 1.0;
+          setpoint_vehicle_pose_.pose.position.z +=
+              0.5 * current_vehicle_twist_.twist.linear.z * std::fabs(current_vehicle_twist_.twist.linear.z) / 1.0;
+        }
         ROS_INFO_STREAM("Hold Position: "
                         << "  x = " << setpoint_vehicle_pose_.pose.position.x
                         << ", y = " << setpoint_vehicle_pose_.pose.position.y
@@ -1196,8 +1219,8 @@ bool MissionSequencer::checkVelocity(const geometry_msgs::TwistStamped& set_velo
   // check if velocity is valid
   if (!b_odom_is_valid_)
   {
-    ROS_WARN_STREAM_THROTTLE(0.5 * sequencer_params_.topic_debug_interval_,
-                             " ->  Cannot check for velocity, velocity not yet valid!");
+    ROS_WARN_STREAM_THROTTLE(0.5 * sequencer_params_.topic_debug_interval_, " ->  Cannot check for velocity, velocity "
+                                                                            "not yet valid!");
     return false;
   }
 

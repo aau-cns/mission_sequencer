@@ -94,6 +94,8 @@ MissionSequencerOptions parse_ros_nodehandle(ros::NodeHandle& nh)
   nh.param<bool>("do_automatically_land", params.b_do_automatically_land_, params.b_do_automatically_land_);
   nh.param<bool>("wp_are_relative", params.b_wp_are_relative_, params.b_wp_are_relative_);
   nh.param<bool>("wp_from_file", params.b_wp_from_file_, params.b_wp_from_file_);
+  nh.param<bool>("do_hold_at_zero_vel", params.b_hold_zero_vel_, params.b_hold_zero_vel_);
+  nh.param<bool>("do_predict_hold_wp", params.b_predict_hold_wp_, params.b_predict_hold_wp_);
   nh.param<bool>("verbose", params.b_do_verbose, params.b_do_verbose);
 
   params.printSequencer();
