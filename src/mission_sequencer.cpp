@@ -82,7 +82,7 @@ MissionSequencer::MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh)
   sub_vehicle_state_ = nh_.subscribe("mavros/state", 10, &MissionSequencer::cbVehicleState, this);
   sub_extended_vehicle_state_ =
       nh_.subscribe("mavros/extended_state", 10, &MissionSequencer::cbExtendedVehicleState, this);
-  sub_vehicle_pose_ = nh_.subscribe(sequencer_params_.topic_ref_pose_, 10, &MissionSequencer::cbPose, this);
+//  sub_vehicle_pose_ = nh_.subscribe(sequencer_params_.topic_ref_pose_, 1, &MissionSequencer::cbPose, this);
   sub_vehicle_pose_ = nh_.subscribe(sequencer_params_.topic_ref_odom_, 1, &MissionSequencer::cbOdom, this,
                                     ros::TransportHints().tcpNoDelay(true));
   sub_ms_request_ = nh_.subscribe("autonomy/request", 10, &MissionSequencer::cbMSRequest, this);

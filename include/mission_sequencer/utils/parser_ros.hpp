@@ -31,7 +31,7 @@ MissionSequencerOptions parse_ros_nodehandle(ros::NodeHandle& nh)
   if (!nh.param<double>("threshold_yaw_rad", params.threshold_yaw_, params.threshold_yaw_))
   {
     ROS_WARN_STREAM("=> mission_sequencer: cannot load parameter for yaw threshold, using default of "
-                    << params.threshold_yaw_ << " deg.");
+                    << params.threshold_yaw_ << " rad.");
   }
 
   // check if yaw is within expected boundaries - i.e. it does not make sense to have more than 180deg=pi in threshold
