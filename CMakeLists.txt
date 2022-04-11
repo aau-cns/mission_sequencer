@@ -300,7 +300,7 @@ set(META_AUTHOR_DOMAIN       "https://gitlab.aau.at/aau-cns/ros_pkgs/amaze_missi
 set(META_AUTHOR_MAINTAINER   "martin.scheiber@aau.at")
 set(META_VERSION_MAJOR       "0")
 set(META_VERSION_MINOR       "1")
-set(META_VERSION_PATCH       "0")
+set(META_VERSION_PATCH       "1")
 set(META_VERSION_REVISION    "${GIT_REV}")
 set(META_VERSION             "${META_VERSION_MAJOR}.${META_VERSION_MINOR}.${META_VERSION_PATCH}")
 set(META_NAME_VERSION        "${META_PROJECT_NAME} v${META_VERSION} (${META_VERSION_REVISION})")
