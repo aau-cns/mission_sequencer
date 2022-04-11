@@ -578,19 +578,16 @@ void MissionSequencer::cbWaypointFilename(const std_msgs::String::ConstPtr& msg)
 
 void MissionSequencer::cbWaypointList(const mission_sequencer::MissionWaypointArrayConstPtr& msg)
 {
+  // parse waypoints and check if all of them are global
   std::vector<ParseWaypoint::Waypoint> new_waypoints;
+  /// \deprecated msg->is_global will be removed in future releases
   if (msg->is_global)
-  {
-    ROS_INFO_STREAM("new waypoints are global");
     new_waypoints = MSMsgConv::WaypointArray2WaypointList(msg->waypoints, ParseWaypoint::ReferenceFrame::GLOBAL);
-  }
   else
-  {
-    ROS_INFO_STREAM("new waypoints are NOT global");
     new_waypoints = MSMsgConv::WaypointArray2WaypointList(msg->waypoints,
                                                           static_cast<ParseWaypoint::ReferenceFrame>(msg->reference));
-  }
 
+  // check if waypoints were provided
   if (new_waypoints.empty())
   {
     ROS_ERROR_STREAM("=> cbWaypointList: Could not add new waypoints as list is empty.");
@@ -901,12 +898,14 @@ void MissionSequencer::performMission()
     // interpret waypoints relative to current pose
     if (waypoint_list_[0].ref_frame == ParseWaypoint::ReferenceFrame::CUR_POS)
     {
+      ROS_DEBUG_STREAM("-> updated CURPOS waypoint to: \n"
+                       << "  x: " << waypoint_list_[0].x << " -> " << next_wp.pose.position.x << "\n"
+                       << "  y: " << waypoint_list_[0].y << " -> " << next_wp.pose.position.y << "\n"
+                       << "  z: " << waypoint_list_[0].z << " -> " << next_wp.pose.position.z );
       waypoint_list_[0].x = next_wp.pose.position.x;
       waypoint_list_[0].y = next_wp.pose.position.y;
       waypoint_list_[0].z = next_wp.pose.position.z;
       waypoint_list_[0].ref_frame = ParseWaypoint::ReferenceFrame::GLOBAL;
-      ROS_INFO_STREAM("updated waypoint to: " << waypoint_list_[0].x << ", " << waypoint_list_[0].y << ","
-                                              << waypoint_list_[0].z);
     }
 
     // check if waypoint is within boundaries

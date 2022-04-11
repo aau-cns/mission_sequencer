@@ -44,6 +44,22 @@ public:
     CUR_POS = 2
   };
 
+  inline friend std::ostream& operator<<(std::ostream& os, ReferenceFrame ref)
+  {
+    switch (ref)
+    {
+      case ReferenceFrame::GLOBAL:
+        return os << "GLOBAL";
+      case ReferenceFrame::LOCAL:
+        return os << "LOCAL ";
+      case ReferenceFrame::CUR_POS:
+        return os << "CURPOS";
+        // omit default case to trigger compiler warning for missing cases
+    }
+
+    return os;
+  }
+
   /**
    * @brief Input struct to parse a single line of a .csv file
    *
@@ -60,15 +76,9 @@ public:
     double yaw;
     double holdtime;
 
-    /// \deprecated
-    //    bool is_global{ false };
-
     ReferenceFrame ref_frame{ ReferenceFrame::LOCAL };
 
     Waypoint(){};
-
-    //    Waypoint(double _x, double _y, double _z, double _yaw, double _holdtime, bool _is_global = false)
-    //      : x(_x), y(_y), z(_z), yaw(_yaw), holdtime(_holdtime), is_global(_is_global){};
 
     Waypoint(double _x, double _y, double _z, double _yaw, double _holdtime, ReferenceFrame _ref_frame)
       : x(_x), y(_y), z(_z), yaw(_yaw), holdtime(_holdtime), ref_frame(_ref_frame){};
