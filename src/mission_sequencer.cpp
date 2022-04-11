@@ -82,7 +82,7 @@ MissionSequencer::MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh)
   sub_vehicle_state_ = nh_.subscribe("mavros/state", 10, &MissionSequencer::cbVehicleState, this);
   sub_extended_vehicle_state_ =
       nh_.subscribe("mavros/extended_state", 10, &MissionSequencer::cbExtendedVehicleState, this);
-//  sub_vehicle_pose_ = nh_.subscribe(sequencer_params_.topic_ref_pose_, 1, &MissionSequencer::cbPose, this);
+  //  sub_vehicle_pose_ = nh_.subscribe(sequencer_params_.topic_ref_pose_, 1, &MissionSequencer::cbPose, this);
   sub_vehicle_pose_ = nh_.subscribe(sequencer_params_.topic_ref_odom_, 1, &MissionSequencer::cbOdom, this,
                                     ros::TransportHints().tcpNoDelay(true));
   sub_ms_request_ = nh_.subscribe("autonomy/request", 10, &MissionSequencer::cbMSRequest, this);
@@ -578,8 +578,19 @@ void MissionSequencer::cbWaypointFilename(const std_msgs::String::ConstPtr& msg)
 
 void MissionSequencer::cbWaypointList(const mission_sequencer::MissionWaypointArrayConstPtr& msg)
 {
-  std::vector<ParseWaypoint::Waypoint> new_waypoints =
-      MSMsgConv::WaypointArray2WaypointList(msg->waypoints, msg->is_global);
+  std::vector<ParseWaypoint::Waypoint> new_waypoints;
+  if (msg->is_global)
+  {
+    ROS_INFO_STREAM("new waypoints are global");
+    new_waypoints = MSMsgConv::WaypointArray2WaypointList(msg->waypoints, ParseWaypoint::ReferenceFrame::GLOBAL);
+  }
+  else
+  {
+    ROS_INFO_STREAM("new waypoints are NOT global");
+    new_waypoints = MSMsgConv::WaypointArray2WaypointList(msg->waypoints,
+                                                          static_cast<ParseWaypoint::ReferenceFrame>(msg->reference));
+  }
+
   if (new_waypoints.empty())
   {
     ROS_ERROR_STREAM("=> cbWaypointList: Could not add new waypoints as list is empty.");
@@ -693,16 +704,29 @@ geometry_msgs::PoseStamped MissionSequencer::waypointToPoseStamped(const ParseWa
 
     waypointQuaternion = startingQuaternion * waypointQuaternion;
 
-    if (!waypoint.is_global)
+    if (!(waypoint.ref_frame == ParseWaypoint::ReferenceFrame::GLOBAL))
     {
+      ROS_INFO_STREAM("updating relative waypoint...");
       double startingYaw, startingPitch, startingRoll;
       tf2::Matrix3x3(startingQuaternion).getEulerYPR(startingYaw, startingPitch, startingRoll);
 
-      pose.pose.position.x =
-          (waypoint.x * cos(startingYaw) - waypoint.y * sin(startingYaw)) + starting_vehicle_pose_.pose.position.x;
-      pose.pose.position.y =
-          (waypoint.x * sin(startingYaw) + waypoint.y * cos(startingYaw)) + starting_vehicle_pose_.pose.position.y;
-      pose.pose.position.z = waypoint.z + starting_vehicle_pose_.pose.position.z;
+      pose.pose.position.x = (waypoint.x * cos(startingYaw) - waypoint.y * sin(startingYaw));
+      pose.pose.position.y = (waypoint.x * sin(startingYaw) + waypoint.y * cos(startingYaw));
+      pose.pose.position.z = waypoint.z;
+
+      // check if waypoint is relative to current or starting position
+      if (waypoint.ref_frame == ParseWaypoint::ReferenceFrame::CUR_POS)
+      {
+        pose.pose.position.x += current_vehicle_pose_.pose.position.x;
+        pose.pose.position.y += current_vehicle_pose_.pose.position.y;
+        pose.pose.position.z += current_vehicle_pose_.pose.position.z;
+      }
+      else
+      {
+        pose.pose.position.x += starting_vehicle_pose_.pose.position.x;
+        pose.pose.position.y += starting_vehicle_pose_.pose.position.y;
+        pose.pose.position.z += starting_vehicle_pose_.pose.position.z;
+      }
     }
   }
 
@@ -873,6 +897,17 @@ void MissionSequencer::performMission()
     geometry_msgs::PoseStamped next_wp = waypointToPoseStamped(waypoint_list_[0]);
     /// \todo TODO(scm): make this check part of the WP callback, such that it is not checked at the check rate, i.e.
     /// 20Hz
+
+    // interpret waypoints relative to current pose
+    if (waypoint_list_[0].ref_frame == ParseWaypoint::ReferenceFrame::CUR_POS)
+    {
+      waypoint_list_[0].x = next_wp.pose.position.x;
+      waypoint_list_[0].y = next_wp.pose.position.y;
+      waypoint_list_[0].z = next_wp.pose.position.z;
+      waypoint_list_[0].ref_frame = ParseWaypoint::ReferenceFrame::GLOBAL;
+      ROS_INFO_STREAM("updated waypoint to: " << waypoint_list_[0].x << ", " << waypoint_list_[0].y << ","
+                                              << waypoint_list_[0].z);
+    }
 
     // check if waypoint is within boundaries
     // Eigen::Vector3d cur_pos =

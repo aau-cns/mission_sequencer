@@ -37,6 +37,13 @@
 class ParseWaypoint
 {
 public:
+  enum class ReferenceFrame
+  {
+    GLOBAL = 0,
+    LOCAL = 1,
+    CUR_POS = 2
+  };
+
   /**
    * @brief Input struct to parse a single line of a .csv file
    *
@@ -53,12 +60,18 @@ public:
     double yaw;
     double holdtime;
 
-    bool is_global{ false };
+    /// \deprecated
+    //    bool is_global{ false };
+
+    ReferenceFrame ref_frame{ ReferenceFrame::LOCAL };
 
     Waypoint(){};
 
-    Waypoint(double _x, double _y, double _z, double _yaw, double _holdtime, bool _is_global=false)
-      : x(_x), y(_y), z(_z), yaw(_yaw), holdtime(_holdtime), is_global(_is_global){};
+    //    Waypoint(double _x, double _y, double _z, double _yaw, double _holdtime, bool _is_global = false)
+    //      : x(_x), y(_y), z(_z), yaw(_yaw), holdtime(_holdtime), is_global(_is_global){};
+
+    Waypoint(double _x, double _y, double _z, double _yaw, double _holdtime, ReferenceFrame _ref_frame)
+      : x(_x), y(_y), z(_z), yaw(_yaw), holdtime(_holdtime), ref_frame(_ref_frame){};
   };
 
   /**
