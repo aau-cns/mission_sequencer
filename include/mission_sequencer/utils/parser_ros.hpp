@@ -90,6 +90,7 @@ MissionSequencerOptions parse_ros_nodehandle(ros::NodeHandle& nh)
   // ==========================================================================
   // SEQUENCER OPTIONS ========================================================
 
+  nh.param<bool>("do_automatic_sequence", params.b_do_autosequence_, params.b_do_autosequence_);
   nh.param<bool>("do_automatically_disarm", params.b_do_automatically_disarm_, params.b_do_automatically_disarm_);
   nh.param<bool>("do_automatically_land", params.b_do_automatically_land_, params.b_do_automatically_land_);
   nh.param<bool>("wp_are_relative", params.b_wp_are_relative_, params.b_wp_are_relative_);

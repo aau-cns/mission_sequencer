@@ -331,6 +331,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
 
           // set waypoint reached to false and transition to new state
           b_wp_is_reached_ = false;
+          b_is_landed_ = false;
           current_sequencer_state_ = SequencerState::TAKEOFF;
 
           // Respond to request
@@ -671,7 +672,6 @@ void MissionSequencer::publishResponse(const uint8_t& id, const uint8_t& request
 {
   mission_sequencer::MissionResponse msg;
 
-  // TODO(cbo): add request topics part
   msg.header = std_msgs::Header();
   msg.header.stamp = ros::Time::now();
   msg.request.id = id;
@@ -856,12 +856,17 @@ void MissionSequencer::performArming()
   {
     if (sequencer_params_.b_do_autosequence_)
     {
-      ROS_INFO("Starting Mission");
-      ROS_INFO("Taking off");
-      // Publish response of start
-      current_sequencer_state_ = SequencerState::MISSION;
+      ROS_INFO_STREAM("* performArming(): automatically starting mission");
+      ROS_INFO_STREAM("* performArming(): ... taking off");
+
+      // set takeoff position
+      setpoint_takeoff_pose_ = starting_vehicle_pose_;
+      setpoint_takeoff_pose_.pose.position.z += sequencer_params_.takeoff_z_;
+
+      // set waypoint reached to false and transition to new state
       b_wp_is_reached_ = false;
-      b_is_landed_ = true;
+      b_is_landed_ = false;
+      current_sequencer_state_ = SequencerState::TAKEOFF;
     }
   }
 }
@@ -901,7 +906,7 @@ void MissionSequencer::performMission()
       ROS_DEBUG_STREAM("-> updated CURPOS waypoint to: \n"
                        << "  x: " << waypoint_list_[0].x << " -> " << next_wp.pose.position.x << "\n"
                        << "  y: " << waypoint_list_[0].y << " -> " << next_wp.pose.position.y << "\n"
-                       << "  z: " << waypoint_list_[0].z << " -> " << next_wp.pose.position.z );
+                       << "  z: " << waypoint_list_[0].z << " -> " << next_wp.pose.position.z);
       waypoint_list_[0].x = next_wp.pose.position.x;
       waypoint_list_[0].y = next_wp.pose.position.y;
       waypoint_list_[0].z = next_wp.pose.position.z;
@@ -960,52 +965,26 @@ void MissionSequencer::performMission()
       // transition to hover state at waypoint
       current_sequencer_state_ = SequencerState::HOVER;
     }
-
-    /// \todo maybe automatically go to hover here, and continue if time has been exceeded
-    // check if holdtime was exceeded
-    //    if (b_wp_is_reached_ && (ros::Time::now().toSec() - time_last_wp_reached_.toSec()) >
-    //    waypointList_[0].holdtime)
-    //    {
-    //      ROS_INFO_STREAM("Waited for: " << waypointList_[0].holdtime << " Seconds");
-    //      waypointList_.erase(waypointList_.begin());
-    //      // FIX(scm): make sure the list is not empty!!!
-    //      if (waypointList_.size() != 0)
-    //      {
-    //        setpoint_vehicle_pose_ = waypointToPoseStamped(waypointList_[0]);
-    //        b_wp_is_reached_ = false;
-    //      }
-    //    }
   }
   else
   {
     ROS_DEBUG_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_, "* No more waypoints to follow...");
-    // check for automatic transition to land state
-    if (sequencer_params_.b_do_automatically_land_)
-    {
-      ROS_FATAL_STREAM("* automatical landing NOT YET IMPLEMENTED");
-    }
 
     // publish mission completion
     publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::UNDEF, false, true);
 
-    //    if (srv_mavros_land_.call(landCmd_) || b_do_automatically_land_)
-    //    {
-    //      if (landCmd_.response.success)
-    //      {
-    //        ROS_INFO("Landing");
-    //        current_sequencer_state_ = SequencerState::LAND;
+    // check if automatically land
+    if (sequencer_params_.b_do_automatically_land_ || sequencer_params_.b_do_autosequence_)
+    {
+      ROS_INFO_STREAM("=> mission_sequencer: automatically triggerde landing");
 
-    //        // Respond that mission succefully finished
-    //        publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::UNDEF, false, true);
-    //      }
-    //    }
+      // transition to new state
+      current_sequencer_state_ = SequencerState::LAND;
+    }
   }
 
-  //  if (b_do_verbose_)
-  //  {
   ROS_DEBUG_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_,
                             "* SequencerState::MISSION; waypoints left: " << waypoint_list_.size());
-  //  }
 }
 
 void MissionSequencer::performHover()
@@ -1024,10 +1003,10 @@ void MissionSequencer::performHover()
         ROS_INFO_STREAM("-    waited for: " << waypoint_list_[0].holdtime << " Seconds");
         waypoint_list_.erase(waypoint_list_.begin());
 
-        // FIX(scm): make sure the list is not empty!!!
-        if (waypoint_list_.size() != 0)
+        // make sure the list is not empty
+        if (!waypoint_list_.empty())
         {
-          setpoint_vehicle_pose_ = waypointToPoseStamped(waypoint_list_[0]);
+          //          setpoint_vehicle_pose_ = waypointToPoseStamped(waypoint_list_[0]);
           b_wp_is_reached_ = false;
         }
         else
@@ -1039,15 +1018,6 @@ void MissionSequencer::performHover()
 
           // publish mission completion
           publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::UNDEF, false, true);
-
-          // check if automatically land
-          if (sequencer_params_.b_do_automatically_land_)
-          {
-            ROS_INFO_STREAM("=> mission_sequencer: automatically triggerde landing");
-
-            // transition to new state
-            current_sequencer_state_ = SequencerState::LAND;
-          }
         }
       }
       else
@@ -1069,10 +1039,20 @@ void MissionSequencer::performHover()
   }
   else
   {
+    // check if automatically land
+    if (sequencer_params_.b_do_automatically_land_ || sequencer_params_.b_do_autosequence_)
+    {
+      ROS_INFO_STREAM("=> mission_sequencer: automatically triggerde landing");
+
+      // transition to new state
+      current_sequencer_state_ = SequencerState::LAND;
+    }
+
     // no more waypoints --> hover at current setpoint
     ROS_DEBUG_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_, "* SequencerState::HOVER; hovering until new "
                                                                        "waypoint "
                                                                        "arrives ...");
+
   }
 }
 
@@ -1114,7 +1094,7 @@ void MissionSequencer::performLand()
                                                                          "ARMED");
 
       // perform auto disarm
-      if (sequencer_params_.b_do_automatically_disarm_)
+      if (sequencer_params_.b_do_automatically_disarm_ || sequencer_params_.b_do_autosequence_)
       {
         ROS_INFO_STREAM("* performLand(): automaticall disarming vehicle");
 
@@ -1161,9 +1141,6 @@ void MissionSequencer::performDisarming()
       if (mavros_cmds_.disarm_cmd_.response.success)
       {
         is_disarmed = true;
-
-        // respond to completion of disarm
-        publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::DISARM, false, true);
       }
     }
   }
@@ -1172,6 +1149,9 @@ void MissionSequencer::performDisarming()
   if (is_disarmed)
   {
     ROS_INFO("=> mission_sequencer: Disarmed!");
+
+    // respond to completion of disarm
+    publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::DISARM, false, true);
 
     // transition to IDLE or PREARM state depending on stuff
     /// \todo TODO(scm): make this part a function called transitionToIDLE/PREARM which checks the wyapointlist etc.
