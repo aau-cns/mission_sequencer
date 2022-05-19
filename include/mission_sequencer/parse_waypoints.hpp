@@ -37,11 +37,15 @@
 class ParseWaypoint
 {
 public:
+  ///
+  /// \brief The ReferenceFrame enum describes the relative frame to which new waypoints are interpreted to
+  ///
   enum class ReferenceFrame
   {
-    GLOBAL = 0,
-    LOCAL = 1,
-    CUR_POS = 2
+    GLOBAL = 0,   //!<  in global frame
+    LOCAL = 1,    //!< relative to starting position and yaw
+    CUR_POS = 2,  //!< relative to current position
+    CUR_POSE = 3  //!< relative to current position and yaw
   };
 
   inline friend std::ostream& operator<<(std::ostream& os, ReferenceFrame ref)
@@ -49,11 +53,13 @@ public:
     switch (ref)
     {
       case ReferenceFrame::GLOBAL:
-        return os << "GLOBAL";
+        return os << "GLOBAL ";
       case ReferenceFrame::LOCAL:
-        return os << "LOCAL ";
+        return os << "LOCAL  ";
       case ReferenceFrame::CUR_POS:
-        return os << "CURPOS";
+        return os << "CURPOS ";
+      case ReferenceFrame::CUR_POSE:
+        return os << "CURPOSE";
         // omit default case to trigger compiler warning for missing cases
     }
 

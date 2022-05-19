@@ -684,8 +684,8 @@ void MissionSequencer::publishResponse(const uint8_t& id, const uint8_t& request
 
 geometry_msgs::PoseStamped MissionSequencer::waypointToPoseStamped(const ParseWaypoint::Waypoint& waypoint)
 {
+  // generate pose from waypoint
   geometry_msgs::PoseStamped pose;
-
   pose.pose.position.x = waypoint.x;
   pose.pose.position.y = waypoint.y;
   pose.pose.position.z = waypoint.z;
@@ -693,40 +693,64 @@ geometry_msgs::PoseStamped MissionSequencer::waypointToPoseStamped(const ParseWa
   tf2::Quaternion waypointQuaternion;
   waypointQuaternion.setRotation(tf2::Vector3(0, 0, 1), waypoint.yaw * DEG_TO_RAD);
   waypointQuaternion.normalize();
-  if (sequencer_params_.b_wp_are_relative_)
+
+  // check for relative settings
+  if (sequencer_params_.b_wp_are_relative_ || waypoint.ref_frame == ParseWaypoint::ReferenceFrame::LOCAL ||
+      waypoint.ref_frame == ParseWaypoint::ReferenceFrame::CUR_POSE)
   {
-    tf2::Quaternion startingQuaternion(
-        starting_vehicle_pose_.pose.orientation.x, starting_vehicle_pose_.pose.orientation.y,
-        starting_vehicle_pose_.pose.orientation.z, starting_vehicle_pose_.pose.orientation.w);
-
-    waypointQuaternion = startingQuaternion * waypointQuaternion;
-
-    if (!(waypoint.ref_frame == ParseWaypoint::ReferenceFrame::GLOBAL))
+    // check if waypoint is relative to current or starting pose
+    if (waypoint.ref_frame >= ParseWaypoint::ReferenceFrame::CUR_POS)
     {
-      ROS_INFO_STREAM("updating relative waypoint...");
+      ROS_DEBUG_STREAM("Updating WP relative to CURRENT POSE");
+      // relative to current pose
+      tf2::Quaternion curentQuaternion(
+          current_vehicle_pose_.pose.orientation.x, current_vehicle_pose_.pose.orientation.y,
+          current_vehicle_pose_.pose.orientation.z, current_vehicle_pose_.pose.orientation.w);
+
+      // get yaw
+      double currentYaw, currentPitch, currentRoll;
+      tf2::Matrix3x3(curentQuaternion).getEulerYPR(currentYaw, currentPitch, currentRoll);
+
+      // update pose
+      waypointQuaternion = curentQuaternion * waypointQuaternion;
+      pose.pose.position.x =
+          (waypoint.x * cos(currentYaw) - waypoint.y * sin(currentYaw)) + current_vehicle_pose_.pose.position.x;
+      pose.pose.position.y =
+          (waypoint.x * sin(currentYaw) + waypoint.y * cos(currentYaw)) + current_vehicle_pose_.pose.position.y;
+      pose.pose.position.z = waypoint.z + current_vehicle_pose_.pose.position.z;
+    }
+    else
+    {
+      ROS_DEBUG_STREAM("Updating WP relative to STARTING POSE");
+      // relative to starting pose
+      tf2::Quaternion startingQuaternion(
+          starting_vehicle_pose_.pose.orientation.x, starting_vehicle_pose_.pose.orientation.y,
+          starting_vehicle_pose_.pose.orientation.z, starting_vehicle_pose_.pose.orientation.w);
+
+      // get yaw
       double startingYaw, startingPitch, startingRoll;
       tf2::Matrix3x3(startingQuaternion).getEulerYPR(startingYaw, startingPitch, startingRoll);
 
-      pose.pose.position.x = (waypoint.x * cos(startingYaw) - waypoint.y * sin(startingYaw));
-      pose.pose.position.y = (waypoint.x * sin(startingYaw) + waypoint.y * cos(startingYaw));
-      pose.pose.position.z = waypoint.z;
-
-      // check if waypoint is relative to current or starting position
-      if (waypoint.ref_frame == ParseWaypoint::ReferenceFrame::CUR_POS)
-      {
-        pose.pose.position.x += current_vehicle_pose_.pose.position.x;
-        pose.pose.position.y += current_vehicle_pose_.pose.position.y;
-        pose.pose.position.z += current_vehicle_pose_.pose.position.z;
-      }
-      else
-      {
-        pose.pose.position.x += starting_vehicle_pose_.pose.position.x;
-        pose.pose.position.y += starting_vehicle_pose_.pose.position.y;
-        pose.pose.position.z += starting_vehicle_pose_.pose.position.z;
-      }
+      // update pose
+      waypointQuaternion = startingQuaternion * waypointQuaternion;
+      pose.pose.position.x =
+          (waypoint.x * cos(startingYaw) - waypoint.y * sin(startingYaw)) + starting_vehicle_pose_.pose.position.x;
+      pose.pose.position.y =
+          (waypoint.x * sin(startingYaw) + waypoint.y * cos(startingYaw)) + starting_vehicle_pose_.pose.position.y;
+      pose.pose.position.z = waypoint.z + starting_vehicle_pose_.pose.position.z;
     }
   }
+  // check for relative position
+  else if (waypoint.ref_frame == ParseWaypoint::ReferenceFrame::CUR_POS)
+  {
+    ROS_DEBUG_STREAM("Updating WP relative to CURRENT POSITION");
+    // update position
+    pose.pose.position.x += current_vehicle_pose_.pose.position.x;
+    pose.pose.position.y += current_vehicle_pose_.pose.position.y;
+    pose.pose.position.z += current_vehicle_pose_.pose.position.z;
+  }
 
+  // update quaternion
   pose.pose.orientation.x = waypointQuaternion[0];
   pose.pose.orientation.y = waypointQuaternion[1];
   pose.pose.orientation.z = waypointQuaternion[2];
@@ -901,7 +925,7 @@ void MissionSequencer::performMission()
     /// 20Hz
 
     // interpret waypoints relative to current pose
-    if (waypoint_list_[0].ref_frame == ParseWaypoint::ReferenceFrame::CUR_POS)
+    if (waypoint_list_[0].ref_frame >= ParseWaypoint::ReferenceFrame::CUR_POS)
     {
       ROS_DEBUG_STREAM("-> updated CURPOS waypoint to: \n"
                        << "  x: " << waypoint_list_[0].x << " -> " << next_wp.pose.position.x << "\n"
@@ -1052,7 +1076,6 @@ void MissionSequencer::performHover()
     ROS_DEBUG_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_, "* SequencerState::HOVER; hovering until new "
                                                                        "waypoint "
                                                                        "arrives ...");
-
   }
 }
 
