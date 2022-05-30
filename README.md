@@ -116,7 +116,8 @@ By default the Mission Sequencer gets the waypoints from the Autonomy [CNS Fligh
 |---------------|-------------|
 | `GLOBAL  = 0`    | the provided WPs are interpreted in the 'global' navigation frame |
 | `LOCAL   = 1`    | the provided WPs are interpreted w.r.t. the starting pose, i.e. 'local frame' |
-| `CUR_POS = 2`    | the provided WPs are interpreted w.r.t. to the current pose, i.e. added to the current position, when they are evaluated |
+| `CUR_POS = 2`    | the provided WPs are interpreted w.r.t. to the current position, i.e. added to the current position, when they are evaluated |
+| `CUR_POSE = 3`   | the provided WPs are interpreted w.r.t. to the current pose (position + yaw), i.e. added to the current position and yaw, when they are evaluated |
 
 If required for your node (obstacle detection), you can get the current list of waypoints with the service: TODO
 
@@ -148,11 +149,7 @@ None at this point in time, please submit an issue request using the git interfa
 |-- docs
 |   |-- CMakeLists.txt
 |   |-- pkg-docs
-|   |   |-- CMakeLists.txt
-|   |   `-- doxyfile.in
 |   `-- resources
-|       |-- cns_UNI_and_CNS_LOGO_uniblue.png
-|       `-- cns_UNI_and_CNS_LOGO_uniblue.svg
 |-- include
 |   `-- mission_sequencer
 |       |-- mission_sequencer.hpp
