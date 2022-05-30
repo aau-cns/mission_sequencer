@@ -992,7 +992,8 @@ void MissionSequencer::performMission()
   }
   else
   {
-    ROS_DEBUG_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_, "* No more waypoints to follow...");
+//    ROS_DEBUG_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_, "* No more waypoints to follow...");
+    ROS_DEBUG_STREAM("* SequencerState::MISSION; No more waypoints to follow...");
 
     // publish mission completion
     publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::UNDEF, false, true);
@@ -1004,6 +1005,19 @@ void MissionSequencer::performMission()
 
       // transition to new state
       current_sequencer_state_ = SequencerState::LAND;
+    }
+    // otherwise transition to hover
+    // this happens to not wait in the mission state forever
+    else
+    {
+      ROS_DEBUG_STREAM("=> mission_sequencer: transition to hover while waiting for next action/waypoints");
+
+      // set waypoint reached and reset timer
+      b_wp_is_reached_ = true;
+      time_last_wp_reached_ = ros::Time::now();
+
+      // transition to hover state at last active waypoint
+      current_sequencer_state_ = SequencerState::HOVER;
     }
   }
 
