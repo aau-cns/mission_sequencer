@@ -21,21 +21,24 @@
   <arg name="takeoff_height_m"        default="1.0" />
 
   <!-- default topic names for remapping (_i: input, _o: output)  type: sensor_msgs::Image -->
-  <arg name="mavros_state_i"                    default="/mavros/state" />
-  <arg name="mavros_extended_state_i"           default="/mavros/extended_state" />
-  <arg name="mavros_local_position_pose_i"      default="/mavros/local_position/pose" />
-  <arg name="autonomy_request_i"                default="/autonomy/request" />
+  <!-- all topics relative to the node's namespace! -->
 
-  <arg name="mavros_setpoint_position_local_o"  default="/mavros/setpoint_position/local" />
-  <arg name="autonomy_response_o"               default="/autonomy/response" />
+  <arg name="mavros_state_i"                    default="mavros/state" />
+  <arg name="mavros_extended_state_i"           default="mavros/extended_state" />
+  <arg name="mavros_local_position_pose_i"      default="mavros/local_position/pose" />
+  <arg name="autonomy_request_i"                default="autonomy/request" />
 
-  <arg name="mavros_cmd_arming_o"               default="/mavros/cmd/arming" />
-  <arg name="mavros_cmd_command_o"              default="/mavros/cmd/command" />
-  <arg name="mavros_cmd_land_o"                 default="/mavros/cmd/land" />
-  <arg name="mavros_set_mode_o"                 default="/mavros/set_mode" />
+  <arg name="mavros_setpoint_position_local_o"  default="mavros/setpoint_position/local" />
+  <arg name="autonomy_response_o"               default="autonomy/response" />
 
-  <arg name="topic_pose_in"                     default="/mavros/local_position/pose" />
-  <arg name="topic_odom_in"                     default="/mavros/local_position/odom" />
+<!-- all services relative to the node's namespace! -->
+  <arg name="mavros_cmd_arming_o"               default="mavros/cmd/arming" />
+  <arg name="mavros_cmd_command_o"              default="mavros/cmd/command" />
+  <arg name="mavros_cmd_land_o"                 default="mavros/cmd/land" />
+  <arg name="mavros_set_mode_o"                 default="mavros/set_mode" />
+
+  <arg name="topic_pose_in"                     default="mavros/local_position/pose" />
+  <arg name="topic_odom_in"                     default="mavros/local_position/odom" />
 
   <arg name="bound_max"                         default="[1.0, 1.0, 1.0]"/>
   <arg name="bound_min"                         default="[-1.0, -1.0, 0.0]"/>
@@ -61,19 +64,19 @@
     <param name="topic_in_odom"           value="$(arg topic_odom_in)" if="$(arg use_odom)"/>
 
     <param name="verbose"                 value="$(arg verbose)" />
-    <!--
+    
     <remap from="mavros/state"                     to="$(arg mavros_state_i)" />
     <remap from="mavros/extended_state"            to="$(arg mavros_extended_state_i)" />
     <remap from="mavros/local_position/pose"       to="$(arg mavros_local_position_pose_i)" />
     <remap from="autonomy/request"                 to="$(arg autonomy_request_i)" />
     <remap from="mavros/setpoint_position/local"   to="$(arg mavros_setpoint_position_local_o)" />
-    <remap from="autonomy/response"                to="$(arg autonomy_response_o)" /> -->
+    <remap from="autonomy/response"                to="$(arg autonomy_response_o)" />
 
 
-    <!--<param name="mavros_cmd_arming_o"    value="$(arg mavros_cmd_arming_o)" />
+    <param name="mavros_cmd_arming_o"    value="$(arg mavros_cmd_arming_o)" />
     <param name="mavros_cmd_command_o"   value="$(arg mavros_cmd_command_o)" />
     <param name="mavros_cmd_land_o"      value="$(arg mavros_cmd_land_o)" />
-    <param name="mavros_set_mode_o"      value="$(arg mavros_set_mode_o)" /> -->
+    <param name="mavros_set_mode_o"      value="$(arg mavros_set_mode_o)" />
 
     <rosparam param="bound_max"          subst_value="True">$(arg bound_max)</rosparam>
     <rosparam param="bound_min"          subst_value="True">$(arg bound_min)</rosparam>
