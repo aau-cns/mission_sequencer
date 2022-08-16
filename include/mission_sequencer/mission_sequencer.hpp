@@ -136,6 +136,7 @@ private:
   ros::Subscriber sub_vehicle_state_;           //!< ROS subscriber for mavros vehicle state
   ros::Subscriber sub_extended_vehicle_state_;  //!< ROS subscriber for extended mavros vehicle state
   ros::Subscriber sub_vehicle_pose_;            //!< ROS subscriber for current vehicle pose
+  ros::Subscriber sub_vehicle_odom_;            //!< ROS subscriber for current vehicle odometry
   ros::Subscriber sub_ms_request_;  //!< ROS subscirber for mission sequencer request (ARM, TAKEOFF, MISSION, LAND, etc)
   ros::Subscriber sub_waypoint_file_name_;  //!< ROS subscriber for waypoint file name
   ros::Subscriber sub_waypoint_list_;       //!< ROS subscriber for waypoint list

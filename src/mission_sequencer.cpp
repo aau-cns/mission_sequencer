@@ -82,8 +82,8 @@ MissionSequencer::MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh)
   sub_vehicle_state_ = nh_.subscribe("mavros/state", 10, &MissionSequencer::cbVehicleState, this);
   sub_extended_vehicle_state_ =
       nh_.subscribe("mavros/extended_state", 10, &MissionSequencer::cbExtendedVehicleState, this);
-  //  sub_vehicle_pose_ = nh_.subscribe(sequencer_params_.topic_ref_pose_, 1, &MissionSequencer::cbPose, this);
-  sub_vehicle_pose_ = nh_.subscribe(sequencer_params_.topic_ref_odom_, 1, &MissionSequencer::cbOdom, this,
+  sub_vehicle_pose_ = nh_.subscribe(sequencer_params_.topic_ref_pose_, 1, &MissionSequencer::cbPose, this);
+  sub_vehicle_odom_ = nh_.subscribe(sequencer_params_.topic_ref_odom_, 1, &MissionSequencer::cbOdom, this,
                                     ros::TransportHints().tcpNoDelay(true));
   sub_ms_request_ = nh_.subscribe("autonomy/request", 10, &MissionSequencer::cbMSRequest, this);
   sub_waypoint_file_name_ = pnh_.subscribe("waypoint_filename", 10, &MissionSequencer::cbWaypointFilename, this);
@@ -301,7 +301,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       else
       {
         ROS_ERROR_STREAM("* mission_sequencer::request::ARM - failed! mavros communication or PREARM error!");
-        ROS_WARN_STREAM("*   Valids: Pose=" << b_pose_is_valid_ << ", State=" << b_state_is_valid_
+        ROS_WARN_STREAM("*   Sanity checks: Pose=" << b_pose_is_valid_ << ", State=" << b_state_is_valid_
                                             << ", extState=" << b_extstate_is_valid_);
 
         b_wrong_input = true;
@@ -545,7 +545,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       {
         if (b_do_verbose_)
         {
-          ROS_WARN_STREAM("* mission_sequencer::request::READ - failed! Not in IDLE nor!");
+          ROS_WARN_STREAM("* mission_sequencer::request::READ - failed! Not in IDLE!");
         }
         b_wrong_input = true;
       }
@@ -553,7 +553,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
     }
 
     default:
-      ROS_ERROR_STREAM("=> mission_sequencer: REQUEST NOT DEFINED");
+      ROS_ERROR_STREAM("=> mission_sequencer: REQUEST NOT DEFINED! (msg->request=" << msg->request << ")");
       b_wrong_input = true;
       break;
   }
@@ -561,7 +561,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
   // respond if false input was provided
   if (b_wrong_input)
   {
-    ROS_ERROR_STREAM("=> mission_sequencer: ISSUE WITH REQUEST FOR CURRENT STATE: " << current_sequencer_state_);
+    ROS_ERROR_STREAM("=> mission_sequencer: ISSUE WITH REQUEST FOR CURRENT STATE: " << current_sequencer_state_ << ", (msg->request=" << msg->request << ")");
     // Respond if input was wrong
     publishResponse(current_mission_ID_, msg->request, false, false);
   }
@@ -860,7 +860,7 @@ void MissionSequencer::performArming()
     }
     else
     {
-      // check if we can arm
+      // check if we can arm: Timeout 2.5 sec
       if (ros::Time::now().toSec() - mavros_cmds_.time_arm_request.toSec() > 2.5)
       {
         if (srv_mavros_arm_.call(mavros_cmds_.arm_cmd_) && mavros_cmds_.arm_cmd_.response.success)
@@ -872,12 +872,22 @@ void MissionSequencer::performArming()
           // respond to completion of arming
           publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::ARM, false, true);
         }
+        else
+        {
+          ROS_WARN("* SequencerState::ARM: service mavros->arm failed!");
+        }
         mavros_cmds_.time_arm_request = ros::Time::now();
+      }
+      else
+      {
+         ROS_INFO_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_, "* SequencerState::ARM: arming timeout ..."); 
       }
     }
   }
-  else
+  // we are already armed
+  else 
   {
+    ROS_INFO_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_, "* SequencerState::ARM: arming completed"); 
     if (sequencer_params_.b_do_autosequence_)
     {
       ROS_INFO_STREAM("* performArming(): automatically starting mission");
@@ -908,6 +918,10 @@ void MissionSequencer::performTakeoff()
       // setpoint reached --> go into hover mode
       ROS_INFO_STREAM("==> TAKEOFF completed");
       current_sequencer_state_ = SequencerState::HOVER;
+
+      // set waypoint reached and reset timer
+      b_wp_is_reached_ = true;
+      time_last_wp_reached_ = ros::Time::now();
 
       // respond to completion of takeoff
       publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::TAKEOFF, false, true);
@@ -1001,7 +1015,7 @@ void MissionSequencer::performMission()
     // check if automatically land
     if (sequencer_params_.b_do_automatically_land_ || sequencer_params_.b_do_autosequence_)
     {
-      ROS_INFO_STREAM("=> mission_sequencer: automatically triggerde landing");
+      ROS_INFO_STREAM("=> mission_sequencer: automatically triggered landing");
 
       // transition to new state
       current_sequencer_state_ = SequencerState::LAND;
@@ -1024,6 +1038,7 @@ void MissionSequencer::performMission()
   ROS_DEBUG_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_,
                             "* SequencerState::MISSION; waypoints left: " << waypoint_list_.size());
 }
+
 
 void MissionSequencer::performHover()
 {
@@ -1068,6 +1083,11 @@ void MissionSequencer::performHover()
                                                                            "is reached ...");
       }
     }
+    else
+    {
+      ROS_INFO_STREAM_THROTTLE("* SequencerState::HOVER: waypoint not yet reached...");
+    }
+
 
     // check if change to mission state is necessary
     if (b_transition_to_mission)
@@ -1080,7 +1100,7 @@ void MissionSequencer::performHover()
     // check if automatically land
     if (sequencer_params_.b_do_automatically_land_ || sequencer_params_.b_do_autosequence_)
     {
-      ROS_INFO_STREAM("=> mission_sequencer: automatically triggerde landing");
+      ROS_INFO_STREAM("=> mission_sequencer: automatically triggered landing");
 
       // transition to new state
       current_sequencer_state_ = SequencerState::LAND;
