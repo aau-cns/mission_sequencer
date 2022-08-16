@@ -919,10 +919,6 @@ void MissionSequencer::performTakeoff()
       ROS_INFO_STREAM("==> TAKEOFF completed");
       current_sequencer_state_ = SequencerState::HOVER;
 
-      // set waypoint reached and reset timer
-      b_wp_is_reached_ = true;
-      time_last_wp_reached_ = ros::Time::now();
-
       // respond to completion of takeoff
       publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::TAKEOFF, false, true);
     }
