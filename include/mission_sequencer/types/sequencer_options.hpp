@@ -11,6 +11,8 @@
 #ifndef MS_SEQUENCER_OPTIONS_HPP_
 #define MS_SEQUENCER_OPTIONS_HPP_
 
+// todo: RJ: filename different than the structure!
+
 #include <ros/ros.h>
 
 #include <eigen3/Eigen/Eigen>
@@ -144,16 +146,16 @@ struct MissionSequencerOptions
 
   // todo: RJ: these names should be relative to the node's namespace otherwise the nodes cannot be grouped properly!
   /// ROS service used for arming the vehicle
-  std::string srv_cmd_arming_{ "/mavros/cmd/arming" };
+  std::string srv_cmd_arming_{ "mavros/cmd/arming" };
 
   /// ROS service used for disarming the vehicle
-  std::string srv_cmd_command_{ "/mavros/cmd/command" };
+  std::string srv_cmd_command_{ "mavros/cmd/command" };
 
   /// ROS service used for issuing land command
-  std::string srv_cmd_land_{ "/mavros/cmd/land" };
+  std::string srv_cmd_land_{ "mavros/cmd/land" };
 
   /// ROS service used to set the mission mode
-  std::string srv_cmd_set_mode_{ "/mavros/set_mode" };
+  std::string srv_cmd_set_mode_{ "mavros/set_mode" };
 
   std::string topic_ref_pose_{ "ref/pose" };
   std::string topic_ref_odom_{ "ref/odom" };

@@ -17,6 +17,8 @@
 
 namespace mission_sequencer
 {
+
+// todo: RJ: method definition of struct/class in wrong file!
 MissionSequencerOptions parse_ros_nodehandle(ros::NodeHandle& nh)
 {
   MissionSequencerOptions params;
@@ -106,6 +108,12 @@ MissionSequencerOptions parse_ros_nodehandle(ros::NodeHandle& nh)
 
   nh.param<std::string>("topic_in_pose", params.topic_ref_pose_, params.topic_ref_pose_);
   nh.param<std::string>("topic_in_odom", params.topic_ref_odom_, params.topic_ref_odom_);
+
+  nh.param<std::string>("mavros_cmd_arming_o", params.srv_cmd_arming_, params.srv_cmd_arming_);
+  nh.param<std::string>("mavros_cmd_command_o", params.srv_cmd_command_, params.srv_cmd_command_);
+  nh.param<std::string>("mavros_cmd_land_o", params.srv_cmd_land_, params.srv_cmd_land_);
+  nh.param<std::string>("mavros_set_mode_o", params.srv_cmd_set_mode_, params.srv_cmd_set_mode_);
+
 
   params.printROS();
 
