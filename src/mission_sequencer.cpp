@@ -1081,7 +1081,7 @@ void MissionSequencer::performHover()
     }
     else
     {
-      ROS_INFO_STREAM_THROTTLE("* SequencerState::HOVER: waypoint not yet reached...");
+      ROS_INFO_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_, "* SequencerState::HOVER: waypoint not yet reached...");
     }
 
 
@@ -1096,7 +1096,7 @@ void MissionSequencer::performHover()
     // check if automatically land
     if (sequencer_params_.b_do_automatically_land_ || sequencer_params_.b_do_autosequence_)
     {
-      ROS_INFO_STREAM("=> mission_sequencer: automatically triggered landing");
+      ROS_INFO_STREAM("=> mission_sequencer: No more waypoints, automatically triggered landing");
 
       // transition to new state
       current_sequencer_state_ = SequencerState::LAND;
