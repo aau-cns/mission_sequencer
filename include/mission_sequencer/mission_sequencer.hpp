@@ -305,8 +305,8 @@ private:
 
   // obtaining a vector of file names depending a ROS parameter with the current mission id 
   // or via a waypoint_fn_ (higher priority).
-  bool getFilenames();
-  bool setFilename(std::string const waypoint_fn);
+  bool reloadFilenames();
+  bool setWaypointFilename(std::string const waypoint_fn);
   bool parseFilename();
 
   // METHODS TO CHECK TRANSITIONS, IDS, STATES, ETC.

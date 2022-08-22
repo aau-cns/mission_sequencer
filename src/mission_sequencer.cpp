@@ -105,7 +105,12 @@ MissionSequencer::MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh)
 
   // set waypoints, if required
   if (sequencer_params_.b_wp_from_file_)
-    setFilename(sequencer_params_.filename_wps_);
+    // set waypoint_fn_
+    if (setWaypointFilename(sequencer_params_.filename_wps_)) 
+    {
+      // load waypoint_fn_ filename into filenames_
+      reloadFilenames();
+    }
 };
 
 MissionSequencer::~MissionSequencer(){
@@ -199,7 +204,7 @@ void MissionSequencer::updatePose(const geometry_msgs::PoseStamped& pose)
   current_vehicle_pose_ = pose;
 }
 
-bool MissionSequencer::getFilenames()
+bool MissionSequencer::reloadFilenames()
 {
   // Define filepaths
   XmlRpc::XmlRpcValue filepaths;
@@ -216,7 +221,7 @@ bool MissionSequencer::getFilenames()
     if (!nh_.getParam("autonomy/missions/mission_" + std::to_string(current_mission_ID_) + "/filepaths", filepaths))
     {
       // [TODO] Manage error
-      ROS_WARN_STREAM("MissionSequencer::getFilenames(): failure! Could not get file paths for CSV waypoint files: "
+      ROS_WARN_STREAM("MissionSequencer::reloadFilenames(): failure! Could not get file paths for CSV waypoint files: "
                       << std::to_string(current_mission_ID_));
       return false;
     }
@@ -262,7 +267,7 @@ bool MissionSequencer::parseFilename()
 
 
 
-bool MissionSequencer::setFilename(std::string const waypoint_fn)
+bool MissionSequencer::setWaypointFilename(std::string const waypoint_fn)
 {
   if (!waypoint_fn.empty())
   {
@@ -553,13 +558,8 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
     }
 
     case mission_sequencer::MissionRequest::READ: {
-      /// READ means: set list of CSV filenames with waypoints and go to PREARM
+      /// READ means: reload a list of CSV filenames with waypoints and go to PREARM
       ROS_DEBUG_STREAM("* mission_sequencer::request::READ...");
-      // transition to IDLE regardless of current state
-      /// \todo TODO(scm): perform this also in PREARM state and create transition function
-
-      /// \todo TODO(rj): READ can also be requested during HOVER in case of not auto sequencing; 
-
 
       // if (checkStateChange(SequencerState::PREARM) || checkStateChange(SequencerState::MISSION))
       if (checkStateChange(SequencerState::PREARM))
@@ -567,7 +567,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
         try
         {
           // Get filepaths
-          if (!getFilenames())
+          if (!reloadFilenames())
           {
             // Respond that mission could not be loaded
             publishResponse(current_mission_ID_, int(msg->request), false, false);
@@ -578,6 +578,8 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
           // Respond that mission has been loaded
           publishResponse(current_mission_ID_, int(msg->request), true, false);
 
+          // clear waypoints before going to PREARM to parse new waypoints:
+          waypoint_list_.clear(); 
           current_sequencer_state_ = SequencerState::PREARM;
         }
         catch (const std::exception& e)
@@ -617,7 +619,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
 void MissionSequencer::cbWaypointFilename(const std_msgs::String::ConstPtr& msg)
 {
   std::string fn = msg->data.c_str();
-  bool res = setFilename(fn);
+  bool res = setWaypointFilename(fn);
   if (b_do_verbose_)
   {
     ROS_INFO_STREAM("Received new waypoint_filename: " << fn << "; accepted:" << res);
@@ -882,16 +884,15 @@ void MissionSequencer::performIdle()
 {
   ROS_DEBUG_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_, "* SequencerState::IDLE");
 
-  /// \todo TODO(rj): set all mission member variables to default: 
+  // set all mission member variables to default: 
   b_wp_is_reached_ = false;
   b_is_landed_ = true;
 
 
-  // transition to IDLE or PREARM state depending on stuff
-  /// \todo TODO(scm): make this part a function called transitionToIDLE/PREARM which checks the waypointlist etc.
-  if (sequencer_params_.b_wp_from_file_ && filenames_.size() != 0)
+  // transition to PREARM state
+  if ((sequencer_params_.b_wp_from_file_ || sequencer_params_.b_do_autosequence_) && filenames_.size() != 0)
   {
-    // delete waypoint list:/
+    // delete waypoint list to parse new waypoints from file
     waypoint_list_.clear(); 
     current_sequencer_state_ = SequencerState::PREARM;
   }
@@ -900,7 +901,9 @@ void MissionSequencer::performIdle()
 void MissionSequencer::performPrearming()
 {
   // waypoint_list must be cleared before entering this state!
-  /// \todo TODO(rj): only one transition possible: from PREAM to ARM via ARM request
+  // Transitions possible: 
+  // - from PREARM to ARM via ARM request or sequencer_params_.b_do_autosequence_
+  // - from PREARM to IDLE via ABORT request
   ROS_INFO_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_, "* SequencerState::PREARM");
 
   if (waypoint_list_.empty())
