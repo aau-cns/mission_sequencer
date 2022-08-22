@@ -116,7 +116,9 @@ void ParseWaypoint::readParseCsv()
 
 const std::vector<ParseWaypoint::Waypoint>& ParseWaypoint::getData() const
 {
-  if (!data_.empty())
+  // todo: rj, an empty data_ is per se not wrong, if something was expected it should be handled somewhere else!
+  return data_;
+  /*if (!data_.empty())
   {
     return data_;
   }
@@ -124,5 +126,5 @@ const std::vector<ParseWaypoint::Waypoint>& ParseWaypoint::getData() const
   {
     throw std::runtime_error("Trying to get data from empty structure, something went wrong when parsing .csv input "
                              "file...");
-  }
+  }*/
 }

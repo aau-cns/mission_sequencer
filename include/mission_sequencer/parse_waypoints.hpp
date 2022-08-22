@@ -34,6 +34,7 @@
  *
  */
 
+// todo: rj, filename should correspond to class name. 
 class ParseWaypoint
 {
 public:
