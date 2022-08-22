@@ -243,6 +243,7 @@ bool MissionSequencer::getFilenames()
 bool MissionSequencer::parseFilename()
 {
   if (filenames_.size() != 0)
+  {
     // Take first entry of filename list
     std::string filename = filenames_[0];
 
@@ -915,7 +916,7 @@ void MissionSequencer::performPrearming()
         current_sequencer_state_ = SequencerState::IDLE;
       }
       else
-      {k
+      {
         ROS_INFO_STREAM("* SequencerState::PREARM: got " << waypoint_list_.size() << " waypoints from file ...");
         current_sequencer_state_ = SequencerState::PREARM;
       }
@@ -1018,7 +1019,6 @@ void MissionSequencer::performTakeoff()
 
       // respond to completion of takeoff
       publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::TAKEOFF, false, true);
-
     }
   }
 }

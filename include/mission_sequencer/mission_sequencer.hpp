@@ -224,6 +224,12 @@ private:
   // EXECUTORS
 private:
   void performIdle();
+
+
+  ///
+  /// \brief performPrearming reads the waypoints from CSV files and waits for ARMING
+  ///
+  void performPrearming(); 
   void performArming();
 
   ///
