@@ -216,7 +216,7 @@ bool MissionSequencer::getFilenames()
     if (!nh_.getParam("autonomy/missions/mission_" + std::to_string(current_mission_ID_) + "/filepaths", filepaths))
     {
       // [TODO] Manage error
-      ROS_WARN_STREAM("AmazeMissionSequencer::getFilenames(): failure! Could not get file paths for mission:"
+      ROS_WARN_STREAM("MissionSequencer::getFilenames(): failure! Could not get file paths for CSV waypoint files: "
                       << std::to_string(current_mission_ID_));
       return false;
     }
@@ -254,8 +254,6 @@ bool MissionSequencer::parseFilename()
 
     // Get the data
     waypoint_list_ = WaypointParser->getData();
-
-    ROS_INFO_STREAM("*  MissionSequencer::parseFilename(): got " << waypoint_list_.size() << " waypoints.");
     return true;
   }
   return false;
@@ -492,22 +490,42 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
     }
 
     case mission_sequencer::MissionRequest::ABORT: {
-      ROS_FATAL_STREAM("* mission_sequencer::request::ABORT...");
-      ROS_WARN_STREAM("=> mission_sequencer: Abort Mission - NOT IMPLEMENTED");
-      /// \todo TODO(scm): ABORT should disable usage of mission sequencer and put it into a locked state, that could
-      /// only be reset by e.g. setting a dynamic parameter
-      //      if (srv_mavros_land_.call(landCmd_))
-      //      {
-      //        if (landCmd_.response.success)
-      //        {
-      //          ROS_INFO("Landing");
-      //          current_sequencer_state_ = LAND;
-      //        }
-      //      }
-      //      current_sequencer_state_ = LAND;
+      if (current_sequencer_state_ == SequencerState::PREARM)
+      {
+        if (checkStateChange(SequencerState::IDLE))
+        {
+          ROS_WARN_STREAM("=> mission_sequencer: Abort Mission - discard loaded waypoints!");
+          current_sequencer_state_ = SequencerState::IDLE;
 
-      // respond to request --> completed immediatly
-      publishResponse(current_mission_ID_, msg->request, true, true);
+          // Respond that loaded waypoints have been discarded
+          publishResponse(current_mission_ID_, int(msg->request), true, false);
+        }
+      }
+      else if (current_sequencer_state_ == SequencerState::IDLE)
+      {
+        publishResponse(current_mission_ID_, int(msg->request), true, false);
+      }
+      else
+      {
+        ROS_FATAL_STREAM("* mission_sequencer::request::ABORT...");
+        ROS_WARN_STREAM("=> mission_sequencer: Abort Mission - NOT IMPLEMENTED");
+        b_wrong_input = true;
+
+        /// \todo TODO(scm): ABORT should disable usage of mission sequencer and put it into a locked state, that could
+        /// only be reset by e.g. setting a dynamic parameter
+        //      if (srv_mavros_land_.call(landCmd_))
+        //      {
+        //        if (landCmd_.response.success)
+        //        {
+        //          ROS_INFO("Landing");
+        //          current_sequencer_state_ = LAND;
+        //        }
+        //      }
+        //      current_sequencer_state_ = LAND;
+
+        // respond to request --> completed immediatly
+        publishResponse(current_mission_ID_, msg->request, true, true);
+      }
       break;
     }
 
@@ -534,12 +552,16 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
     }
 
     case mission_sequencer::MissionRequest::READ: {
+      /// READ means: set list of CSV filenames with waypoints and go to PREARM
       ROS_DEBUG_STREAM("* mission_sequencer::request::READ...");
       // transition to IDLE regardless of current state
       /// \todo TODO(scm): perform this also in PREARM state and create transition function
 
-      // if (checkStateChange(SequencerState::PREARM))
-      if (current_sequencer_state_ == SequencerState::IDLE)
+      /// \todo TODO(rj): READ can also be requested during HOVER in case of not auto sequencing; 
+
+
+      // if (checkStateChange(SequencerState::PREARM) || checkStateChange(SequencerState::MISSION))
+      if (checkStateChange(SequencerState::PREARM))
       {
         try
         {
@@ -548,16 +570,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
           {
             // Respond that mission could not be loaded
             publishResponse(current_mission_ID_, int(msg->request), false, false);
-            ROS_INFO_STREAM("CAN NOT SET WAYPOINT FILE NAMES FOR MISSION(S)");
-            return;
-          }
-
-          // Parse waypoints from a file path or list of filenames
-          if (!parseFilename())
-          {
-            // Respond that mission could not be loaded
-            publishResponse(current_mission_ID_, int(msg->request), false, false);
-            ROS_INFO_STREAM("CAN NOT READ WAYPOINT(S) from file");
+            ROS_WARN_STREAM("* mission_sequencer::request::READ: CAN NOT SET WAYPOINT FILE NAMES FOR MISSION(S)");
             return;
           }
 
@@ -798,14 +811,11 @@ void MissionSequencer::logic(void)
   {
     case SequencerState::IDLE:
       performIdle();
-      return;
+      break;
 
     case SequencerState::PREARM:
-      if (b_do_verbose_)
-      {
-        ROS_INFO_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_, "* SequencerState::PREARM");
-      }
-      return;
+      performPrearming();
+      break;
 
     case SequencerState::ARM:
       performArming();
@@ -870,6 +880,56 @@ void MissionSequencer::publishPoseSetpoint(void)
 void MissionSequencer::performIdle()
 {
   ROS_DEBUG_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_, "* SequencerState::IDLE");
+
+  /// \todo TODO(rj): set all mission member variables to default: 
+  b_wp_is_reached_ = false;
+  b_is_landed_ = true;
+
+
+  // transition to IDLE or PREARM state depending on stuff
+  /// \todo TODO(scm): make this part a function called transitionToIDLE/PREARM which checks the waypointlist etc.
+  if (sequencer_params_.b_wp_from_file_ && filenames_.size() != 0)
+  {
+    // delete waypoint list:/
+    waypoint_list_.clear(); 
+    current_sequencer_state_ = SequencerState::PREARM;
+  }
+}
+
+void MissionSequencer::performPrearming()
+{
+  // waypoint_list must be cleared before entering this state!
+  /// \todo TODO(rj): only one transition possible: from PREAM to ARM via ARM request
+  ROS_INFO_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_, "* SequencerState::PREARM");
+
+  if (waypoint_list_.empty())
+  {
+
+    // Parse waypoints from a file path or list of filenames
+    if (parseFilename())
+    {
+      if (waypoint_list_.empty())
+      {
+        // no waypoints: PREARM -> IDLE -> PREAM  (repeats until waypoints or no more filenames!)
+        ROS_INFO_STREAM("* SequencerState::PREARM: no WAYPOINT(S) read from file...");
+        current_sequencer_state_ = SequencerState::IDLE;
+      }
+      else
+      {k
+        ROS_INFO_STREAM("* SequencerState::PREARM: got " << waypoint_list_.size() << " waypoints from file ...");
+        current_sequencer_state_ = SequencerState::PREARM;
+      }
+      
+      // erase current filename 
+      filenames_.erase(filenames_.begin());
+    }
+    else
+    {
+      ROS_INFO_STREAM("* SequencerState::PREARM: no files to read WAYPOINT(S) from ...");
+      current_sequencer_state_ = SequencerState::IDLE;
+    }
+  }
+
 }
 
 void MissionSequencer::performArming()
@@ -950,10 +1010,15 @@ void MissionSequencer::performTakeoff()
     {
       // setpoint reached --> go into hover mode
       ROS_INFO_STREAM("==> TAKEOFF completed");
+
+      // todo: RJ: performHover reads "b_wp_is_reached_" thus this flag might be set in advance!
+      b_wp_is_reached_ = false;
+      b_is_landed_ = false;
       current_sequencer_state_ = SequencerState::HOVER;
 
       // respond to completion of takeoff
       publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::TAKEOFF, false, true);
+
     }
   }
 }
@@ -1033,35 +1098,21 @@ void MissionSequencer::performMission()
       current_sequencer_state_ = SequencerState::HOVER;
     }
   }
-  else
+  else 
   {
-//    ROS_DEBUG_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_, "* No more waypoints to follow...");
     ROS_DEBUG_STREAM("* SequencerState::MISSION; No more waypoints to follow...");
 
     // publish mission completion
     publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::UNDEF, false, true);
 
-    // check if automatically land
-    if (sequencer_params_.b_do_automatically_land_ || sequencer_params_.b_do_autosequence_)
-    {
-      ROS_INFO_STREAM("=> mission_sequencer: automatically triggered landing");
+    ROS_DEBUG_STREAM("=> mission_sequencer: transition to hover while waiting for next action/waypoints");
 
-      // transition to new state
-      current_sequencer_state_ = SequencerState::LAND;
-    }
-    // otherwise transition to hover
-    // this happens to not wait in the mission state forever
-    else
-    {
-      ROS_DEBUG_STREAM("=> mission_sequencer: transition to hover while waiting for next action/waypoints");
+    // set waypoint reached and reset timer
+    b_wp_is_reached_ = true;
+    time_last_wp_reached_ = ros::Time::now();
 
-      // set waypoint reached and reset timer
-      b_wp_is_reached_ = true;
-      time_last_wp_reached_ = ros::Time::now();
-
-      // transition to hover state at last active waypoint
-      current_sequencer_state_ = SequencerState::HOVER;
-    }
+    // transition to hover state at last active waypoint
+    current_sequencer_state_ = SequencerState::HOVER;
   }
 
   ROS_DEBUG_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_,
@@ -1124,21 +1175,23 @@ void MissionSequencer::performHover()
       current_sequencer_state_ = SequencerState::MISSION;
     }
   }
-  else
+  else // no more waypoints in waypoint_list_
   {
     // check if automatically land
     if (sequencer_params_.b_do_automatically_land_ || sequencer_params_.b_do_autosequence_)
     {
-      ROS_INFO_STREAM("=> mission_sequencer: No more waypoints, automatically triggered landing");
+      ROS_INFO_STREAM("* SequencerState::HOVER; No more waypoints to follow: automatically triggered landing...");
 
       // transition to new state
       current_sequencer_state_ = SequencerState::LAND;
     }
-
-    // no more waypoints --> hover at current setpoint
-    ROS_DEBUG_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_, "* SequencerState::HOVER; hovering until new "
-                                                                       "waypoint "
-                                                                       "arrives ...");
+    else
+    {
+      // no more waypoints --> hover at current setpoint
+      ROS_DEBUG_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_, "* SequencerState::HOVER; hovering until new "
+                                                                         "waypoint "
+                                                                         "arrives ...");
+    }
   }
 }
 
@@ -1176,13 +1229,13 @@ void MissionSequencer::performLand()
     {
       // still armed
       ROS_DEBUG_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_, "* SequencerState::LAND->LANDED --> "
-                                                                         "Vehicle definetly still "
+                                                                         "Vehicle definitely still "
                                                                          "ARMED");
 
       // perform auto disarm
       if (sequencer_params_.b_do_automatically_disarm_ || sequencer_params_.b_do_autosequence_)
       {
-        ROS_INFO_STREAM("* performLand(): automaticall disarming vehicle");
+        ROS_INFO_STREAM("* performLand(): automatically disarming vehicle");
 
         // transition to disarm state
         current_sequencer_state_ = SequencerState::DISARM;
@@ -1238,26 +1291,7 @@ void MissionSequencer::performDisarming()
 
     // respond to completion of disarm
     publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::DISARM, false, true);
-
-    // transition to IDLE or PREARM state depending on stuff
-    /// \todo TODO(scm): make this part a function called transitionToIDLE/PREARM which checks the wyapointlist etc.
-    if (sequencer_params_.b_wp_from_file_)
-    {
-      filenames_.erase(filenames_.begin());
-      waypoint_list_.clear();
-      if (filenames_.size() == 0)
-      {
-        current_sequencer_state_ = SequencerState::IDLE;
-      }
-      else
-      {
-        current_sequencer_state_ = SequencerState::PREARM;
-      }
-    }
-    else
-    {
-      current_sequencer_state_ = SequencerState::IDLE;
-    }
+    current_sequencer_state_ = SequencerState::IDLE;
   }
 }
 
@@ -1391,8 +1425,11 @@ bool MissionSequencer::checkStateChange(const SequencerState new_state) const
     case SequencerState::PREARM:
       // PREARM -> request(ARM) -> ARM
       // PREARM -> request(READ) -> PREARM
+      // PREARM -> IDLE
       if (new_state == SequencerState::ARM)
         return true;
+      if (new_state == SequencerState::IDLE)
+        return true;      
       break;
 
     case SequencerState::ARM:
