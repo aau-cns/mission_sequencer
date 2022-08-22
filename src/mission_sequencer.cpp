@@ -216,7 +216,7 @@ bool MissionSequencer::getFilenames()
     if (!nh_.getParam("autonomy/missions/mission_" + std::to_string(current_mission_ID_) + "/filepaths", filepaths))
     {
       // [TODO] Manage error
-      ROS_WARN_STREAM("AmazeMissionSequencer::getFilenames(): failure! Cound not get file paths for mission:"
+      ROS_WARN_STREAM("AmazeMissionSequencer::getFilenames(): failure! Could not get file paths for mission:"
                       << std::to_string(current_mission_ID_));
       return false;
     }
@@ -239,6 +239,29 @@ bool MissionSequencer::getFilenames()
 
   return false;
 };
+
+bool MissionSequencer::parseFilename()
+{
+  if (filenames_.size() != 0)
+    // Take first entry of filename list
+    std::string filename = filenames_[0];
+
+    std::vector<std::string> header_default = {"x", "y", "z", "yaw", "holdtime"};
+    std::shared_ptr<ParseWaypoint> WaypointParser =  std::make_shared<ParseWaypoint>(filename, header_default);
+
+    // Parse waypoint file
+    WaypointParser->readParseCsv();
+
+    // Get the data
+    waypoint_list_ = WaypointParser->getData();
+
+    ROS_INFO_STREAM("*  MissionSequencer::parseFilename(): got " << waypoint_list_.size() << " waypoints.");
+    return true;
+  }
+  return false;
+}
+
+
 
 bool MissionSequencer::setFilename(std::string const waypoint_fn)
 {
@@ -515,6 +538,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       // transition to IDLE regardless of current state
       /// \todo TODO(scm): perform this also in PREARM state and create transition function
 
+      // if (checkStateChange(SequencerState::PREARM))
       if (current_sequencer_state_ == SequencerState::IDLE)
       {
         try
@@ -524,7 +548,16 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
           {
             // Respond that mission could not be loaded
             publishResponse(current_mission_ID_, int(msg->request), false, false);
-            ROS_INFO_STREAM("CAN NOT READ MISSION(S)");
+            ROS_INFO_STREAM("CAN NOT SET WAYPOINT FILE NAMES FOR MISSION(S)");
+            return;
+          }
+
+          // Parse waypoints from a file path or list of filenames
+          if (!parseFilename())
+          {
+            // Respond that mission could not be loaded
+            publishResponse(current_mission_ID_, int(msg->request), false, false);
+            ROS_INFO_STREAM("CAN NOT READ WAYPOINT(S) from file");
             return;
           }
 
@@ -1350,6 +1383,8 @@ bool MissionSequencer::checkStateChange(const SequencerState new_state) const
     case SequencerState::IDLE:
       // IDLE -> request(ARM) --> PREARM/ARM
       if (new_state == SequencerState::ARM)
+        return true;
+      else if (new_state == SequencerState::PREARM)
         return true;
       break;
 
