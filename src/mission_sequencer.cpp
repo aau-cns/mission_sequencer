@@ -919,8 +919,11 @@ void MissionSequencer::performPrearming()
       {
         ROS_INFO_STREAM("* SequencerState::PREARM: got " << waypoint_list_.size() << " waypoints from file ...");
         current_sequencer_state_ = SequencerState::PREARM;
+        if (sequencer_params_.b_do_autosequence_)
+        {
+          current_sequencer_state_ = SequencerState::ARM;
+        }
       }
-      
       // erase current filename 
       filenames_.erase(filenames_.begin());
     }
@@ -930,6 +933,7 @@ void MissionSequencer::performPrearming()
       current_sequencer_state_ = SequencerState::IDLE;
     }
   }
+
 
 }
 
@@ -1025,7 +1029,7 @@ void MissionSequencer::performTakeoff()
 
 void MissionSequencer::performMission()
 {
-  // check if we still have waypoints in the list
+  // check if we still have waypoints in the list, otherwise got to HOVER
   if (waypoint_list_.size() > 0)
   {
     geometry_msgs::PoseStamped next_wp = waypointToPoseStamped(waypoint_list_[0]);
