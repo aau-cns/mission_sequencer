@@ -106,6 +106,16 @@ void ParseWaypoint::readParseCsv()
       {
         tmp.holdtime = 0;
       }
+
+      if (indices.size() > 5)
+      {
+        tmp.ref_frame = static_cast<ReferenceFrame>((int)it.at(indices.at(5)));
+      }
+      else
+      {
+        tmp.ref_frame  = ReferenceFrame::GLOBAL;
+      }
+      
       data_.push_back(tmp);
     }
   }

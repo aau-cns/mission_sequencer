@@ -83,7 +83,7 @@ public:
     double yaw;
     double holdtime;
 
-    ReferenceFrame ref_frame{ ReferenceFrame::LOCAL };
+    ReferenceFrame ref_frame{ ReferenceFrame::GLOBAL };
 
     Waypoint(){};
 
