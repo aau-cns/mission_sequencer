@@ -1190,6 +1190,7 @@ void MissionSequencer::performHover()
       ROS_INFO_STREAM("* SequencerState::HOVER; No more waypoints to follow: automatically triggered landing...");
 
       // transition to new state
+      b_executed_landing_ = false;
       current_sequencer_state_ = SequencerState::LAND;
     }
     else
@@ -1207,7 +1208,14 @@ void MissionSequencer::performLand()
   ROS_DEBUG_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_, "* SequencerState::LAND: performing landing ...");
   // call landing if not executed yet correctly
   if (!b_executed_landing_)
+  {
     b_executed_landing_ = executeLanding();
+    if (!b_executed_landing_)
+    {
+      ROS_WARN_STREAM("* SequencerState::LAND; executing mavors landing command failed! ...");
+    } 
+  }
+
 
   // mavros check to see if landed
   if (current_vehicle_ext_state_.landed_state == current_vehicle_ext_state_.LANDED_STATE_ON_GROUND && !b_is_landed_)
