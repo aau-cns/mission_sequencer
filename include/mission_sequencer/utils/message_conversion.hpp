@@ -13,34 +13,21 @@
 
 #include <mission_sequencer/MissionWaypointArray.h>
 
-#include "parse_waypoints.hpp"
+#include "types/sequencer_waypoint.hpp"
 
 namespace mission_sequencer
 {
 class MSMsgConv
 {
 public:
-  //  static std::vector<ParseWaypoint::Waypoint> WaypointArray2WaypointList(const
-  //  std::vector<mission_sequencer::MissionWaypoint>& waypoint_array, const bool wp_are_global=false)
-  //  {
-  //    std::vector<ParseWaypoint::Waypoint> waypoint_list;
-  //    for (const auto wp : waypoint_array)
-  //    {
-  //      waypoint_list.push_back(ParseWaypoint::Waypoint(wp.x, wp.y, wp.z, wp.yaw, wp.holdtime, wp_are_global));
-  //      std::cout << "  added wp with ref_frame: global=" << wp_are_global << std::endl;
-  //    }
-
-  //    return waypoint_list;
-  //  }
-
-  static std::vector<ParseWaypoint::Waypoint>
+  static std::vector<Waypoint>
   WaypointArray2WaypointList(const std::vector<mission_sequencer::MissionWaypoint>& waypoint_array,
-                             const ParseWaypoint::ReferenceFrame ref_frame = ParseWaypoint::ReferenceFrame::LOCAL)
+                             const Waypoint::ReferenceFrame ref_frame = Waypoint::ReferenceFrame::LOCAL)
   {
-    std::vector<ParseWaypoint::Waypoint> waypoint_list;
+    std::vector<Waypoint> waypoint_list;
     for (const auto wp : waypoint_array)
     {
-      waypoint_list.push_back(ParseWaypoint::Waypoint(wp.x, wp.y, wp.z, wp.yaw, wp.holdtime, ref_frame));
+      waypoint_list.push_back(Waypoint(wp.x, wp.y, wp.z, wp.yaw, wp.holdtime, ref_frame));
     }
 
     return waypoint_list;

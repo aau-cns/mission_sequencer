@@ -41,9 +41,9 @@
 #include <mission_sequencer/GetStartPose.h>
 
 // Waypoint list
-#include "parse_waypoints.hpp"
 #include "types/sequencer_options.hpp"
 #include "types/sequencer_types.hpp"
+#include "types/sequencer_waypoint.hpp"
 
 //#define RAD_TO_DEG (180.0 / M_PI)
 //#define DEG_TO_RAD (M_PI / 180.0)
@@ -52,16 +52,6 @@ namespace mission_sequencer
 {
 class MissionSequencer
 {
-public:
-  //  friend inline std::ostream& operator<<(std::ostream os, geometry_msgs::PoseStamped pose)
-  //  {
-  //    return os << "[[" << pose.pose.position.x << ", " << pose.pose.position.y << ", " << pose.pose.position.z << "],
-  //    "
-  //              << pose.pose.orientation.w << ", " << pose.pose.orientation.x << ", " << pose.pose.orientation.y << ",
-  //              "
-  //              << pose.pose.orientation.z << "]]";
-  //  }
-
 private:
   ///
   /// \brief The MavrosCommands struct implements a hardcoded structure to easily send ARM, DISARM, LAND and MODE
@@ -225,11 +215,10 @@ private:
 private:
   void performIdle();
 
-
   ///
   /// \brief performPrearming reads the waypoints from CSV files and waits for ARMING
   ///
-  void performPrearming(); 
+  void performPrearming();
   void performArming();
 
   ///
@@ -286,8 +275,8 @@ private:
 
   uint8_t current_mission_ID_;  //!< determines the ID of the current mission (used to safeguard that requests are
                                 //!< acutally made for the correct mission)
-  std::vector<ParseWaypoint::Waypoint> waypoint_list_;  //!< list of waypoints currently in use
-  ros::Time time_last_wp_reached_;                      //!< time since last waypoint was reached
+  std::vector<Waypoint> waypoint_list_;  //!< list of waypoints currently in use
+  ros::Time time_last_wp_reached_;       //!< time since last waypoint was reached
 
   // communication variables
 private:
@@ -301,9 +290,9 @@ private:
   /// vector of filenames read from parameter server
   std::vector<std::string> filenames_;
 
-  geometry_msgs::PoseStamped waypointToPoseStamped(const ParseWaypoint::Waypoint& waypoint);
+  geometry_msgs::PoseStamped waypointToPoseStamped(const Waypoint& waypoint);
 
-  // obtaining a vector of file names depending a ROS parameter with the current mission id 
+  // obtaining a vector of file names depending a ROS parameter with the current mission id
   // or via a waypoint_fn_ (higher priority).
   bool reloadFilenames();
   bool setWaypointFilename(std::string const waypoint_fn);

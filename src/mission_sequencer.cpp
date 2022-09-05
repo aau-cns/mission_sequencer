@@ -14,6 +14,7 @@
 
 #include "utils/message_conversion.hpp"
 #include "utils/parser_ros.hpp"
+#include "utils/parser_waypoints.hpp"
 
 namespace std
 {
@@ -60,7 +61,7 @@ MissionSequencer::MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh)
   starting_vehicle_pose_ = geometry_msgs::PoseStamped();
   setpoint_vehicle_pose_ = geometry_msgs::PoseStamped();
 
-  waypoint_list_ = std::vector<ParseWaypoint::Waypoint>(0);
+  waypoint_list_ = std::vector<Waypoint>(0);
   time_last_wp_reached_ = ros::Time::now();
 
   // TODO(scm): maybe make the mission_id uninitialized just in case
@@ -253,13 +254,13 @@ bool MissionSequencer::parseFilename()
     std::string filename = filenames_[0];
 
     std::vector<std::string> header_default = { "x", "y", "z", "yaw", "holdtime" };
-    std::shared_ptr<ParseWaypoint> WaypointParser = std::make_shared<ParseWaypoint>(filename, header_default);
+    std::shared_ptr<WaypointParser> waypoint_parser = std::make_shared<WaypointParser>(filename, header_default);
 
     // Parse waypoint file
-    WaypointParser->readParseCsv();
+    waypoint_parser->readParseCsv();
 
     // Get the data
-    waypoint_list_ = WaypointParser->getData();
+    waypoint_list_ = waypoint_parser->getData();
     return true;
   }
   return false;
@@ -628,13 +629,13 @@ void MissionSequencer::cbWaypointFilename(const std_msgs::String::ConstPtr& msg)
 void MissionSequencer::cbWaypointList(const mission_sequencer::MissionWaypointArrayConstPtr& msg)
 {
   // parse waypoints and check if all of them are global
-  std::vector<ParseWaypoint::Waypoint> new_waypoints;
+  std::vector<Waypoint> new_waypoints;
   /// \deprecated msg->is_global will be removed in future releases
   if (msg->is_global)
-    new_waypoints = MSMsgConv::WaypointArray2WaypointList(msg->waypoints, ParseWaypoint::ReferenceFrame::GLOBAL);
+    new_waypoints = MSMsgConv::WaypointArray2WaypointList(msg->waypoints, Waypoint::ReferenceFrame::GLOBAL);
   else
-    new_waypoints = MSMsgConv::WaypointArray2WaypointList(msg->waypoints,
-                                                          static_cast<ParseWaypoint::ReferenceFrame>(msg->reference));
+    new_waypoints =
+        MSMsgConv::WaypointArray2WaypointList(msg->waypoints, static_cast<Waypoint::ReferenceFrame>(msg->reference));
 
   // check if waypoints were provided
   if (new_waypoints.empty())
@@ -656,7 +657,7 @@ void MissionSequencer::cbWaypointList(const mission_sequencer::MissionWaypointAr
   else
   {
     // otherwise the wp are added to list (depending on append or insert
-    std::vector<ParseWaypoint::Waypoint>::iterator it_cur_wp = waypoint_list_.end();
+    std::vector<Waypoint>::iterator it_cur_wp = waypoint_list_.end();
     if (msg->action == mission_sequencer::MissionWaypointArray::INSERT)
     {
       //      ROS_WARN_STREAM("=> cbWaypointList: INSERT is not yet implemented, APPENDING waypoints");
@@ -730,7 +731,7 @@ void MissionSequencer::publishResponse(const uint8_t& id, const uint8_t& request
   pub_ms_response_.publish(msg);
 };
 
-geometry_msgs::PoseStamped MissionSequencer::waypointToPoseStamped(const ParseWaypoint::Waypoint& waypoint)
+geometry_msgs::PoseStamped MissionSequencer::waypointToPoseStamped(const Waypoint& waypoint)
 {
   // generate pose from waypoint
   geometry_msgs::PoseStamped pose;
@@ -743,11 +744,11 @@ geometry_msgs::PoseStamped MissionSequencer::waypointToPoseStamped(const ParseWa
   waypointQuaternion.normalize();
 
   // check for relative settings
-  if (sequencer_params_.b_wp_are_relative_ || waypoint.ref_frame == ParseWaypoint::ReferenceFrame::LOCAL ||
-      waypoint.ref_frame == ParseWaypoint::ReferenceFrame::CUR_POSE)
+  if (sequencer_params_.b_wp_are_relative_ || waypoint.ref_frame == Waypoint::ReferenceFrame::LOCAL ||
+      waypoint.ref_frame == Waypoint::ReferenceFrame::CUR_POSE)
   {
     // check if waypoint is relative to current or starting pose
-    if (waypoint.ref_frame >= ParseWaypoint::ReferenceFrame::CUR_POS)
+    if (waypoint.ref_frame >= Waypoint::ReferenceFrame::CUR_POS)
     {
       ROS_DEBUG_STREAM("Updating WP relative to CURRENT POSE");
       // relative to current pose
@@ -789,7 +790,7 @@ geometry_msgs::PoseStamped MissionSequencer::waypointToPoseStamped(const ParseWa
     }
   }
   // check for relative position
-  else if (waypoint.ref_frame == ParseWaypoint::ReferenceFrame::CUR_POS)
+  else if (waypoint.ref_frame == Waypoint::ReferenceFrame::CUR_POS)
   {
     ROS_DEBUG_STREAM("Updating WP relative to CURRENT POSITION");
     // update position
@@ -1054,7 +1055,7 @@ void MissionSequencer::performMission()
     /// 20Hz
 
     // interpret waypoints relative to current pose
-    if (waypoint_list_[0].ref_frame >= ParseWaypoint::ReferenceFrame::CUR_POS)
+    if (waypoint_list_[0].ref_frame >= Waypoint::ReferenceFrame::CUR_POS)
     {
       ROS_DEBUG_STREAM("-> updated CURPOS waypoint to: \n"
                        << "  x: " << waypoint_list_[0].x << " -> " << next_wp.pose.position.x << "\n"
@@ -1063,7 +1064,7 @@ void MissionSequencer::performMission()
       waypoint_list_[0].x = next_wp.pose.position.x;
       waypoint_list_[0].y = next_wp.pose.position.y;
       waypoint_list_[0].z = next_wp.pose.position.z;
-      waypoint_list_[0].ref_frame = ParseWaypoint::ReferenceFrame::GLOBAL;
+      waypoint_list_[0].ref_frame = Waypoint::ReferenceFrame::GLOBAL;
     }
 
     // check if waypoint is within boundaries

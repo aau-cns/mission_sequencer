@@ -1,16 +1,25 @@
-/*
- * Alessandro Fornasier (CNS)
- * alessandro.fornasier@aau.at
- */
+// Copyright (C) 2022 Alessandro Fornasier, Martin Scheiber,
+// Control of Networked Systems, University of Klagenfurt, Austria.
+//
+// All rights reserved.
+//
+// This software is licensed under the terms of the BSD-2-Clause-License with
+// no commercial use allowed, the full terms of which are made available
+// in the LICENSE file. No license in patents is granted.
+//
+// You can contact the authors at <alessandro.fornasier@aau.at>
+// and <martin.scheiber@aau.at>.
 
-#include "parse_waypoints.hpp"
+#include "utils/parser_waypoints.hpp"
 
-ParseWaypoint::ParseWaypoint(std::string& filename, std::vector<std::string>& categories)
+namespace mission_sequencer
+{
+WaypointParser::WaypointParser(std::string& filename, std::vector<std::string>& categories)
   : filename_(filename), categories_(categories)
 {
 }
 
-void ParseWaypoint::getIndices(const std::vector<std::string>& header, std::vector<int>& indices)
+void WaypointParser::getIndices(const std::vector<std::string>& header, std::vector<int>& indices)
 {
   // Temporary index
   int idx;
@@ -24,7 +33,7 @@ void ParseWaypoint::getIndices(const std::vector<std::string>& header, std::vect
   }
 }
 
-void ParseWaypoint::parseLine(std::string& line, std::vector<std::string>& data)
+void WaypointParser::parseLine(std::string& line, std::vector<std::string>& data)
 {
   // Create a stringstream of the current line
   std::stringstream ss(line);
@@ -39,7 +48,7 @@ void ParseWaypoint::parseLine(std::string& line, std::vector<std::string>& data)
   }
 }
 
-void ParseWaypoint::readParseCsv()
+void WaypointParser::readParseCsv()
 {
   std::ifstream file(filename_);
 
@@ -109,11 +118,11 @@ void ParseWaypoint::readParseCsv()
 
       if (indices.size() > 5)
       {
-        tmp.ref_frame = static_cast<ReferenceFrame>((int)it.at(indices.at(5)));
+        tmp.ref_frame = static_cast<Waypoint::ReferenceFrame>((int)it.at(indices.at(5)));
       }
       else
       {
-        tmp.ref_frame = ReferenceFrame::GLOBAL;
+        tmp.ref_frame = Waypoint::ReferenceFrame::GLOBAL;
       }
 
       data_.push_back(tmp);
@@ -124,7 +133,7 @@ void ParseWaypoint::readParseCsv()
   std::cout << "File read successfully." << std::endl << "----------------------------------------\n" << std::endl;
 }
 
-const std::vector<ParseWaypoint::Waypoint>& ParseWaypoint::getData() const
+const std::vector<Waypoint>& WaypointParser::getData() const
 {
   // INFO(rj): an empty data_ is per se not wrong, if something was expected it should be handled somewhere else!
   return data_;
@@ -138,3 +147,4 @@ const std::vector<ParseWaypoint::Waypoint>& ParseWaypoint::getData() const
                              "file...");
   }*/
 }
+}  // namespace mission_sequencer

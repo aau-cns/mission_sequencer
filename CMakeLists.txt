@@ -169,16 +169,17 @@ set(source_path  "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(headers
     ${include_path}/types/sequencer_types.hpp
     ${include_path}/types/sequencer_options.hpp
+    ${include_path}/types/sequencer_waypoint.hpp
     ${include_path}/utils/message_conversion.hpp
     ${include_path}/utils/parser_ros.hpp
-    ${include_path}/parse_waypoints.hpp
+    ${include_path}/utils/parser_waypoints.hpp
     ${include_path}/mission_sequencer.hpp
 )
 
 set(sources
     ${source_path}/mission_sequencer_node.cpp
     ${source_path}/mission_sequencer.cpp
-    ${source_path}/parse_waypoints.cpp
+    ${source_path}/parser_waypoints.cpp
 )
 
 ## Group Source and Header files correctly
