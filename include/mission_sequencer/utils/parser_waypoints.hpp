@@ -44,7 +44,7 @@ public:
   ///
   /// \brief constructor
   ///
-  WaypointParser(std::string& filename, std::vector<std::string>& categories);
+  WaypointParser(const std::string& filename, const std::vector<std::string>& categories);
 
   ///
   /// \brief Clear actual data, read a new .csv file and convert to a matrix (vector of vectors)
@@ -80,10 +80,10 @@ private:
   /// This function is overloaded to include either string values
   /// (usually the case for headers) or numerical values
   ///
-  void parseLine(std::string& line, std::vector<std::string>& data);
+  void parseLine(const std::string& line, std::vector<std::string>* const data);
 
   template <typename T>
-  void parseLine(std::string& line, std::vector<T>& data)
+  void parseLine(const std::string& line, std::vector<T>* const data)
   {
     // Create a stringstream of the current line
     std::stringstream ss(line);
@@ -94,7 +94,7 @@ private:
     // Extract each cell
     while (ss >> tmp)
     {
-      data.push_back(tmp);
+      data->push_back(tmp);
 
       // skip commas
       if (ss.peek() == ',')
@@ -111,13 +111,20 @@ private:
   /// Input structure allowing inpput files with shuffled columns or even
   /// more columns than the onse that are necessary
   ///
-  void getIndices(const std::vector<std::string>& header, std::vector<int>& indices);
+  void getIndices(const std::vector<std::string>& header, std::vector<int>* const indices);
 
   ///
   /// \brief Find the index of token within the given vector
   ///
+
+  ///
+  /// \brief getIndex Find the index of token within the given vector
+  /// \param data Data vector to search for token
+  /// \param token Token to search for in data
+  /// \param index (return value) Index at which data was first found
+  ///
   template <typename T>
-  void getIndex(const std::vector<T>& data, const T& token, int& index)
+  void getIndex(const std::vector<T>& data, const T& token, int* const index)
   {
     // Iterator
     auto it = find(data.begin(), data.end(), token);
@@ -126,7 +133,7 @@ private:
     if (it != data.end())
     {
       // Get the index
-      index = it - data.begin();
+      *index = it - data.begin();
     }
     else
     {

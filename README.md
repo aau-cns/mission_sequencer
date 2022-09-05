@@ -138,7 +138,7 @@ None at this point in time, please submit an issue request using the git interfa
 
 ## Package Layout
 
-```console
+```[console]
 /path/to/mission_sequencer$ tree -L 3 --noreport --charset unicode
 .
 |-- cmake

@@ -295,14 +295,14 @@ private:
   // obtaining a vector of file names depending a ROS parameter with the current mission id
   // or via a waypoint_fn_ (higher priority).
   bool reloadFilenames();
-  bool setWaypointFilename(std::string const waypoint_fn);
+  bool setWaypointFilename(const std::string waypoint_fn);
   bool parseFilename();
 
   // METHODS TO CHECK TRANSITIONS, IDS, STATES, ETC.
 private:
   bool checkWaypoint(const geometry_msgs::PoseStamped& current_waypoint);
   bool checkVelocity(const geometry_msgs::TwistStamped& set_velocity);
-  bool checkStateChange(const SequencerState new_state) const;
+  bool checkStateChange(const SequencerState& new_state) const;
 
   ///
   /// \brief checkMissionID checks if the mission ID is suitable with the current mission ID

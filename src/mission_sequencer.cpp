@@ -266,7 +266,7 @@ bool MissionSequencer::parseFilename()
   return false;
 }
 
-bool MissionSequencer::setWaypointFilename(std::string const waypoint_fn)
+bool MissionSequencer::setWaypointFilename(const std::string waypoint_fn)
 {
   if (!waypoint_fn.empty())
   {
@@ -1439,7 +1439,7 @@ bool MissionSequencer::checkVelocity(const geometry_msgs::TwistStamped& set_velo
   return vel_reached;
 }
 
-bool MissionSequencer::checkStateChange(const SequencerState new_state) const
+bool MissionSequencer::checkStateChange(const SequencerState &new_state) const
 {
   switch (current_sequencer_state_)
   {

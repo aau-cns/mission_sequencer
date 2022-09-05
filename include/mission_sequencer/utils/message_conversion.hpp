@@ -1,4 +1,4 @@
-// Copyright (C) 2021 Martin Scheiber, Control of Networked Systems, University of Klagenfurt, Austria.
+// Copyright (C) 2022 Martin Scheiber, Control of Networked Systems, University of Klagenfurt, Austria.
 //
 // All rights reserved.
 //
@@ -22,7 +22,7 @@ class MSMsgConv
 public:
   static std::vector<Waypoint>
   WaypointArray2WaypointList(const std::vector<mission_sequencer::MissionWaypoint>& waypoint_array,
-                             const Waypoint::ReferenceFrame ref_frame = Waypoint::ReferenceFrame::LOCAL)
+                             const Waypoint::ReferenceFrame& ref_frame = Waypoint::ReferenceFrame::LOCAL)
   {
     std::vector<Waypoint> waypoint_list;
     for (const auto wp : waypoint_array)

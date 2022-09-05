@@ -14,12 +14,12 @@
 
 namespace mission_sequencer
 {
-WaypointParser::WaypointParser(std::string& filename, std::vector<std::string>& categories)
+WaypointParser::WaypointParser(const std::string &filename, const std::vector<std::string> &categories)
   : filename_(filename), categories_(categories)
 {
 }
 
-void WaypointParser::getIndices(const std::vector<std::string>& header, std::vector<int>& indices)
+void WaypointParser::getIndices(const std::vector<std::string>& header, std::vector<int> *const indices)
 {
   // Temporary index
   int idx;
@@ -28,12 +28,12 @@ void WaypointParser::getIndices(const std::vector<std::string>& header, std::vec
   for (const auto& it : categories_)
   {
     // Get index
-    getIndex(header, it, idx);
-    indices.push_back(idx);
+    getIndex(header, it, &idx);
+    indices->push_back(idx);
   }
 }
 
-void WaypointParser::parseLine(std::string& line, std::vector<std::string>& data)
+void WaypointParser::parseLine(const std::string &line, std::vector<std::string> *const data)
 {
   // Create a stringstream of the current line
   std::stringstream ss(line);
@@ -44,7 +44,7 @@ void WaypointParser::parseLine(std::string& line, std::vector<std::string>& data
   // Extract each cell
   while (std::getline(ss, tmp, ','))
   {
-    data.push_back(tmp);
+    data->push_back(tmp);
   }
 }
 
@@ -78,19 +78,19 @@ void WaypointParser::readParseCsv()
     std::getline(file, line);
 
     // Parse the header
-    parseLine(line, header);
+    parseLine(line, &header);
 
     // Read data, line by line
     while (std::getline(file, line))
     {
       std::vector<double> tmp;
-      parseLine(line, tmp);
+      parseLine(line, &tmp);
       data.push_back(tmp);
       ++rows_cnt;
     }
 
     // Get association (indices) based on the defined convention
-    getIndices(header, indices);
+    getIndices(header, &indices);
 
     // clear data structure from previous data
     data_.clear();
