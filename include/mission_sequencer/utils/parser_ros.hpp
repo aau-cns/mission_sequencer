@@ -17,8 +17,6 @@
 
 namespace mission_sequencer
 {
-
-// todo: RJ: method definition of struct/class in wrong file!
 MissionSequencerOptions parse_ros_nodehandle(ros::NodeHandle& nh)
 {
   MissionSequencerOptions params;
@@ -48,17 +46,17 @@ MissionSequencerOptions parse_ros_nodehandle(ros::NodeHandle& nh)
   // determine takeoff type
   int to_type = 0;
   nh.param<int>("takeoff_type", to_type, to_type);
-  switch(to_type)
+  switch (to_type)
   {
     case 0:
-      params.takeoff_type_=TakeoffType::POSITION;
+      params.takeoff_type_ = TakeoffType::POSITION;
       break;
     case 1:
       params.takeoff_type_ = TakeoffType::VELOCITY;
       break;
     default:
-      ROS_WARN_STREAM("=> mission_sequencer: unknown takeoff type " << to_type <<". Defaulting to POSITION.");
-      params.takeoff_type_=TakeoffType::POSITION;
+      ROS_WARN_STREAM("=> mission_sequencer: unknown takeoff type " << to_type << ". Defaulting to POSITION.");
+      params.takeoff_type_ = TakeoffType::POSITION;
       break;
   }
 
@@ -81,10 +79,9 @@ MissionSequencerOptions parse_ros_nodehandle(ros::NodeHandle& nh)
     params.bound_ref_ = MissionSequencerOptions::BoundReference::GLOBAL;
   else
   {
-    ROS_WARN_STREAM("=> mission_sequencer: unknown boundary reference " << bound_ref <<". Defaulting to LOCAL.");
+    ROS_WARN_STREAM("=> mission_sequencer: unknown boundary reference " << bound_ref << ". Defaulting to LOCAL.");
     params.bound_ref_ = MissionSequencerOptions::BoundReference::LOCAL;
   }
-
 
   // output navigation params
   params.printNavigation();
@@ -113,7 +110,6 @@ MissionSequencerOptions parse_ros_nodehandle(ros::NodeHandle& nh)
   nh.param<std::string>("mavros_cmd_command_o", params.srv_cmd_command_, params.srv_cmd_command_);
   nh.param<std::string>("mavros_cmd_land_o", params.srv_cmd_land_, params.srv_cmd_land_);
   nh.param<std::string>("mavros_set_mode_o", params.srv_cmd_set_mode_, params.srv_cmd_set_mode_);
-
 
   params.printROS();
 

@@ -113,9 +113,9 @@ void ParseWaypoint::readParseCsv()
       }
       else
       {
-        tmp.ref_frame  = ReferenceFrame::GLOBAL;
+        tmp.ref_frame = ReferenceFrame::GLOBAL;
       }
-      
+
       data_.push_back(tmp);
     }
   }
@@ -126,7 +126,7 @@ void ParseWaypoint::readParseCsv()
 
 const std::vector<ParseWaypoint::Waypoint>& ParseWaypoint::getData() const
 {
-  // todo: rj, an empty data_ is per se not wrong, if something was expected it should be handled somewhere else!
+  // INFO(rj): an empty data_ is per se not wrong, if something was expected it should be handled somewhere else!
   return data_;
   /*if (!data_.empty())
   {
