@@ -1,5 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright (C) 2022 Martin Scheiber and Christoph Boehm, and others,
+  Control of Networked Systems, University of Klagenfurt, Austria.
 
+  All rights reserved.
+
+  This software is licensed under the terms of the BSD-2-Clause-License with
+  no commercial use allowed, the full terms of which are made available
+  in the LICENSE file. No license in patents is granted.
+
+  You can contact the author at <martin.scheiber@ieee.org> and
+  <alessandro.fornasier@ieee.org>.
+-->
 <launch>
   <arg name="node_name"               default="mission_sequencer"/>
 
@@ -64,7 +76,7 @@
     <param name="topic_in_odom"           value="$(arg topic_odom_in)" if="$(arg use_odom)"/>
 
     <param name="verbose"                 value="$(arg verbose)" />
-    
+
     <remap from="mavros/state"                     to="$(arg mavros_state_i)" />
     <remap from="mavros/extended_state"            to="$(arg mavros_extended_state_i)" />
     <remap from="mavros/local_position/pose"       to="$(arg mavros_local_position_pose_i)" />

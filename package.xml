@@ -1,18 +1,16 @@
 <?xml version="1.0"?>
 <package format="2">
   <name>mission_sequencer</name>
-  <version>0.1.1</version>
+  <version>1.0.0</version>
   <description>The mission_sequencer package: Lets the drone fly a given (through a file) path triggered by the autonomy engine.</description>
 
   <!-- MAINTAINERS -->
-  <maintainer email="christoph.boehm@aau.at">Christoph Böhm</maintainer>
   <maintainer email="christian.brommer@ieee.com">Christian Brommer</maintainer>
   <maintainer email="alessandro.fornasier@ieee.com">Alessandro Fornasier</maintainer>
   <maintainer email="martin.scheiber@aau.at">Martin Scheiber</maintainer>
 
   <!-- LICENSE -->
-  <license>BSD-2-Clause</license>
-
+  <license>BSD-2-Clause-License with no commercial use allowed. No license in patents is granted.</license>
 
   <!-- Url tags are optional, but multiple are allowed, one per tag -->
   <!-- Optional attribute type can be: website, bugtracker, or repository -->
@@ -36,7 +34,6 @@
   <depend>rospy</depend>
   <depend>std_msgs</depend>
   <depend>mavros_msgs</depend>
-
 
   <build_depend>message_generation</build_depend>
   <exec_depend>message_runtime</exec_depend>

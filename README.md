@@ -1,6 +1,11 @@
-# CNS FlightStack: Mission Sequencer
+# CNS Flight Stack: Mission Sequencer
 
 [![License](https://img.shields.io/badge/License-AAUCNS-green.svg)](./LICENSE)
+
+Maintainer: [Martin Scheiber](mailto:martin.scheiber@aau.at)
+
+## Credit
+This code was written by the [Control of Networked System (CNS)](https://www.aau.at/en/smart-systems-technologies/control-of-networked-systems/), University of Klagenfurt, Klagenfurt, Austria.
 
 ## License
 This software is made available to the public to use (_source-available_), licensed under the terms of the BSD-2-Clause-License with no commercial use allowed, the full terms of which are made available in the `LICENSE` file. No license in patents is granted.
@@ -10,22 +15,28 @@ If you use this software in an academic research setting, please cite the
 corresponding paper and consult the `LICENSE` file for a detailed explanation.
 
 ```latex
-@inproceedings{cns_flightstack22,
-   author   = {Martin Scheiber and Alessandro Fornasier and Roland Jung and Christoph Boehm and Rohit Dhakate
-               and Christian Stewart and Jan Steinbrener and Stephan Weiss and Christian Brommer},
-   journal  = {under review},
-   title    = {Flight Stack for Reproducible and Customizable Autonomy Applications in Research and Industry},
-   year     = {2022},
+@article{cns_flightstack22,
+    title        = {Flight Stack for Reproducible and Customizable Autonomy Applications in Research and Industry},
+    author       = {Scheiber, Martin and Fornasier, Alessandro and Jung, Roland and Böhm, Christoph and Dhakate, Rohit and Stewart, Christian and Steinbrener, Jan and Weiss, Stephan and Brommer, Christian},
+    journal      = {IEEE Robotics and Automation Letters},
+    volume       = {7},
+    number       = {4},
+    year         = {2022},
+    doi          = {10.1109/LRA.2022.3196117},
+    url          = {https://ieeexplore.ieee.org/document/9849131},
+    pages        = {11283--11290}
 }
 ```
+
+---
 
 ## Getting Started
 
 ### Prerequesites
 This package is part of the [CNS FlightStack] and thus depends on the other packages of the flightstack:
 - [CNS FlightStack: Autonomy Engine]
-- MavROS
-- PX4Bridge
+- [MavROS (CNS Version)]
+- [PX4Bridge (CNS Version)]
 
 Further the following libraries are required
 - Eigen
@@ -74,9 +85,9 @@ The following parameters can be set to modify the sequencer's behavior:
 | `wp_from_file`            | (_deprecated_) read waypoints from file | `false` |
 | `waypoint_filename`       | (_deprecated_) filename to read waypoints from  | ` ` |
 
-### Default Launchfile Parameters
+<!-- ### Default Launchfile Parameters
 
-TODO
+TODO -->
 
 ### Usage without Autonomy Engine
 
@@ -119,18 +130,17 @@ By default the Mission Sequencer gets the waypoints from the Autonomy [CNS Fligh
 | `CUR_POS = 2`    | the provided WPs are interpreted w.r.t. to the current position, i.e. added to the current position, when they are evaluated |
 | `CUR_POSE = 3`   | the provided WPs are interpreted w.r.t. to the current pose (position + yaw), i.e. added to the current position and yaw, when they are evaluated |
 
-If required for your node (obstacle detection), you can get the current list of waypoints with the service: TODO
+If required for your node (obstacle detection), you can get the current list of waypoints with the service:
 
-<!-- Command to set filepath to test_trajectory.csv:
-```cmd
-rosparam set /autonomy/missions/mission_0/filepaths ["/home/chriboehm/workspaces/mission_ws/src/amaze_mission_sequencer/trajectories/test_trajectory.csv"]
-``` -->
+```console
+rosservice call /mission_sequencer/getStartPose "{}"
+```
 
 ## Architecture
 
 Please refer to the academic paper for further insights of the Mission Sequencer.
 
-TODO: include the state machine graph here
+![test](./docs/resources/state_diagram_sequencer.png)
 
 ## Known Issues
 
@@ -143,22 +153,24 @@ None at this point in time, please submit an issue request using the git interfa
 .
 |-- cmake
 |   |-- Custom.cmake
-|   |-- GetGitRevisionDescription.cmake
-|   `-- GetGitRevisionDescription.cmake.in
+|   `-- GetGitRevisionDescription.cmake
 |-- CMakeLists.txt
 |-- docs
 |   |-- CMakeLists.txt
 |   |-- pkg-docs
+|   |   |-- CMakeLists.txt
+|   |   `-- doxyfile.in
 |   `-- resources
+|       |-- cns_UNI_and_CNS_LOGO_uniblue.png
+|       `-- cns_UNI_and_CNS_LOGO_uniblue.svg
 |-- include
 |   `-- mission_sequencer
 |       |-- mission_sequencer.hpp
-|       |-- parse_waypoints.hpp
 |       |-- types
 |       `-- utils
 |-- launch
 |   `-- mission_sequencer.launch
-|-- LICENSE.md
+|-- LICENSE
 |-- msg
 |   |-- MissionRequest.msg
 |   |-- MissionResponse.msg
@@ -169,7 +181,7 @@ None at this point in time, please submit an issue request using the git interfa
 |-- src
 |   |-- mission_sequencer.cpp
 |   |-- mission_sequencer_node.cpp
-|   `-- parse_waypoints.cpp
+|   `-- parser_waypoints.cpp
 |-- srv
 |   `-- GetStartPose.srv
 `-- trajectories
@@ -180,3 +192,5 @@ None at this point in time, please submit an issue request using the git interfa
 <!-- LINKS: -->
 [CNS FlightStack]: http://sst.aau.at/cns
 [CNS FlightStack: Autonomy Engine]: http://sst.aau.at/cns
+[MavROS (CNS Version)]: https://github.com/aau-cns/mavros
+[PX4Bridge (CNS Version)]: https://github.com/aau-cns/PX4-Autopilot

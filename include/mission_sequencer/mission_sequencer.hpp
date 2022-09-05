@@ -1,4 +1,4 @@
-// Copyright (C) 2021 Martin Scheiber, Christoph Boehm,
+// Copyright (C) 2021 Christian Brommer, Martin Scheiber, Christoph Boehm,
 // and others, Control of Networked Systems, University of Klagenfurt, Austria.
 //
 // All rights reserved.
@@ -7,8 +7,8 @@
 // no commercial use allowed, the full terms of which are made available
 // in the LICENSE file. No license in patents is granted.
 //
-// You can contact the authors at <martin.scheiber@ieee.org>,
-// and <christoph.boehm@aau.at>
+// You can contact the authors at <christian.brommer@ieee.org>,
+// <martin.scheiber@ieee.org>, and <christoph.boehm@aau.at>
 
 #ifndef MISSION_SEQUENCER_HPP
 #define MISSION_SEQUENCER_HPP

@@ -7,7 +7,7 @@
 // no commercial use allowed, the full terms of which are made available
 // in the LICENSE file. No license in patents is granted.
 //
-// You can contact the authors at <christian.brommer@ieee.org>, 
+// You can contact the authors at <christian.brommer@ieee.org>,
 // <martin.scheiber@ieee.org>, and <christoph.boehm@aau.at>
 
 #include "mission_sequencer.hpp"
