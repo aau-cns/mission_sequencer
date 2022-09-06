@@ -12,7 +12,7 @@ This software is made available to the public to use (_source-available_), licen
 
 ### Usage for academic purposes
 If you use this software in an academic research setting, please cite the
-corresponding paper and consult the `LICENSE` file for a detailed explanation.
+corresponding [academic paper] and consult the `LICENSE` file for a detailed explanation.
 
 ```latex
 @article{cns_flightstack22,
@@ -138,9 +138,9 @@ rosservice call /mission_sequencer/getStartPose "{}"
 
 ## Architecture
 
-Please refer to the academic paper for further insights of the Mission Sequencer.
+Please refer to the [academic paper] for further insights of the Mission Sequencer.
 
-![test](./docs/resources/state_diagram_sequencer.png)
+![mission_sequencer state diagram](./docs/resources/state_diagram_sequencer.png)
 
 ## Known Issues
 
@@ -194,3 +194,4 @@ None at this point in time, please submit an issue request using the git interfa
 [CNS FlightStack: Autonomy Engine]: http://sst.aau.at/cns
 [MavROS (CNS Version)]: https://github.com/aau-cns/mavros
 [PX4Bridge (CNS Version)]: https://github.com/aau-cns/PX4-Autopilot
+[academic paper]: https://ieeexplore.ieee.org/document/9849131
