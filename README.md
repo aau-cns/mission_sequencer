@@ -1,6 +1,7 @@
 # CNS Flight Stack: Mission Sequencer
 
-[![License](https://img.shields.io/badge/License-AAUCNS-green.svg)](./LICENSE)
+<!-- [![Release](https://img.shields.io/github/v/release/aau-cns/flight_stack?logo=github)](https://github.com/aau-cns/flight_stack/releases) [![ROS](https://img.shields.io/github/workflow/status/aau-cns/flight_stack/ROS/main?logo=ROS&label=ROS1%20build)](https://github.com/aau-cns/flight_stack/actions/workflows/ros.yml) [![Dependencies](https://img.shields.io/librariesio/github/aau-cns/flight_stack)](https://github.com/aau-cns/flight_stack/blob/main/src/) -->
+[![License](https://img.shields.io/badge/License-AAUCNS-336B81.svg)](./LICENSE) [![Paper](https://img.shields.io/badge/IEEEXplore-10.1109/LRA.2022.3196117-00629B.svg?logo=ieee)](https://doi.org/10.1109/LRA.2022.3196117)
 
 Maintainer: [Martin Scheiber](mailto:martin.scheiber@aau.at)
 
@@ -16,7 +17,7 @@ corresponding [academic paper] and consult the `LICENSE` file for a detailed exp
 
 ```latex
 @article{cns_flightstack22,
-    title        = {Flight Stack for Reproducible and Customizable Autonomy Applications in Research and Industry},
+    title        = {CNS Flight Stack for Reproducible, Customizable, and Fully Autonomous Applications},
     author       = {Scheiber, Martin and Fornasier, Alessandro and Jung, Roland and Böhm, Christoph and Dhakate, Rohit and Stewart, Christian and Steinbrener, Jan and Weiss, Stephan and Brommer, Christian},
     journal      = {IEEE Robotics and Automation Letters},
     volume       = {7},
@@ -33,8 +34,8 @@ corresponding [academic paper] and consult the `LICENSE` file for a detailed exp
 ## Getting Started
 
 ### Prerequesites
-This package is part of the [CNS FlightStack] and thus depends on the other packages of the flightstack:
-- [CNS FlightStack: Autonomy Engine]
+This package is part of the [CNS Flight Stack] and thus depends on the other packages of the flight stack:
+- [CNS Flight Stack: Autonomy Engine]
 - [MavROS (CNS Version)]
 - [PX4Bridge (CNS Version)]
 
@@ -54,7 +55,7 @@ catkin build mission_sequencer
 
 ## Usage
 
-The intended usage is together with the [CNS FlightStack: Autonomy Engine], which will interact with the mission sequencer. Use the provided launchfile to start the Mission Sequencer
+The intended usage is together with the [CNS Flight Stack: Autonomy Engine], which will interact with the mission sequencer. Use the provided launchfile to start the Mission Sequencer
 
 ```bash
 roslaunch mission_sequencer mission_sequencer.launch
@@ -91,7 +92,7 @@ TODO -->
 
 ### Usage without Autonomy Engine
 
-If required the sequencer can be used without the [CNS FlightStack: Autonomy Engine]. The easiest way to do this is to enable the automatic sequencing, i.e. setting `do_automatic_sequence` to `true`. Then, when ready start the mission by publishing the `ARM` request:
+If required the sequencer can be used without the [CNS Flight Stack: Autonomy Engine]. The easiest way to do this is to enable the automatic sequencing, i.e. setting `do_automatic_sequence` to `true`. Then, when ready start the mission by publishing the `ARM` request:
 
 ```bash
 rostopic pub /autonomy/request mission_sequencer/MissionRequest \
@@ -190,8 +191,8 @@ None at this point in time, please submit an issue request using the git interfa
 
 
 <!-- LINKS: -->
-[CNS FlightStack]: http://sst.aau.at/cns
-[CNS FlightStack: Autonomy Engine]: http://sst.aau.at/cns
+[CNS Flight Stack]: http://sst.aau.at/cns
+[CNS Flight Stack: Autonomy Engine]: http://sst.aau.at/cns
 [MavROS (CNS Version)]: https://github.com/aau-cns/mavros
 [PX4Bridge (CNS Version)]: https://github.com/aau-cns/PX4-Autopilot
 [academic paper]: https://ieeexplore.ieee.org/document/9849131
