@@ -4,6 +4,7 @@ title: "[Feature]: "
 labels: ["feature", "request", "todo"]
 assignees:
   - mascheiber
+  - ChrisBee
   - AlessandroFornasier
 body:
   - type: markdown
