@@ -1,7 +1,9 @@
 # CNS Flight Stack: Mission Sequencer
 
-<!-- [![Release](https://img.shields.io/github/v/release/aau-cns/flight_stack?logo=github)](https://github.com/aau-cns/flight_stack/releases) [![ROS](https://img.shields.io/github/workflow/status/aau-cns/flight_stack/ROS/main?logo=ROS&label=ROS1%20build)](https://github.com/aau-cns/flight_stack/actions/workflows/ros.yml) [![Dependencies](https://img.shields.io/librariesio/github/aau-cns/flight_stack)](https://github.com/aau-cns/flight_stack/blob/main/src/) -->
+[![Release](https://img.shields.io/github/v/release/aau-cns/mission_sequencer?include_prereleases&logo=github)](https://github.com/aau-cns/mission_sequencer/releases) 
 [![License](https://img.shields.io/badge/License-AAUCNS-336B81.svg)](./LICENSE) [![Paper](https://img.shields.io/badge/IEEEXplore-10.1109/LRA.2022.3196117-00629B.svg?logo=ieee)](https://doi.org/10.1109/LRA.2022.3196117)
+
+ROS package to sequencer mission waypoints and communicate them to the controller.
 
 Maintainer: [Martin Scheiber](mailto:martin.scheiber@aau.at)
 
@@ -189,6 +191,10 @@ None at this point in time, please submit an issue request using the git interfa
     `-- test_trajectory.csv
 ```
 
+---
+
+Copyright (C) 2021-2023 Christian Brommer, Christoph Böhm, Alessandro Fornasier, Roland Jung, and Martin Scheiber, Control of Networked Systems, University of Klagenfurt, Austria.
+You can contact the authors at [christian.brommer@aau.at](mailto:christian.brommer@aau.at?subject=[CNS%20Flight%20Stack]%20mission_sequencer%20package), [christoph.boehm@aau.at](mailto:christoph.boehm@aau.at?subject=[CNS%20Flight%20Stack]%20mission_sequencer%20package), [alessandro.fornasier@aau.at](mailto:alessandro.fornasier@aau.at?subject=[CNS%20Flight%20Stack]%20mission_sequencer%20package), [roland.jung@aau.at](mailto:roland.jung@aau.at?subject=[CNS%20Flight%20Stack]%20mission_sequencer%20package), [martin.scheiber@aau.at](mailto:martin.scheiber@aau.at?subject=[CNS%20Flight%20Stack]%20mission_sequencer%20package).
 
 <!-- LINKS: -->
 [CNS Flight Stack]: http://sst.aau.at/cns
