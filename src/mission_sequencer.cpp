@@ -1,4 +1,4 @@
-// Copyright (C) 2021 Christian Brommer, Martin Scheiber, Christoph Boehm,
+// Copyright (C) 2023 Christian Brommer, Martin Scheiber, Christoph Boehm,
 // and others, Control of Networked Systems, University of Klagenfurt, Austria.
 //
 // All rights reserved.
@@ -309,27 +309,43 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       // arming, no takeoff
     case mission_sequencer::MissionRequest::ARM: {
       ROS_INFO_STREAM("* mission_sequencer::request::ARM...");
-      if (checkStateChange(SequencerState::ARM) && b_pose_is_valid_ && b_state_is_valid_ && b_extstate_is_valid_)
+      if (checkStateChange(SequencerState::ARM))
       {
-        // Set initial pose
-        starting_vehicle_pose_ = current_vehicle_pose_;
-        setpoint_vehicle_pose_ = current_vehicle_pose_;
+        // set time for valid request
+        time_last_valid_request_ = ros::Time::now().toSec();
 
-        // Preparation for arming
-        mavros_cmds_.arm_cmd_.request.value = true;  // QUESTION(scm); is this actually needed?
-        mavros_cmds_.time_arm_request = ros::Time::now();
-        mavros_cmds_.time_offboard_request = ros::Time::now();
-        current_sequencer_state_ = SequencerState::ARM;
+        if (b_pose_is_valid_ && b_state_is_valid_ && b_extstate_is_valid_)
+        {
+          // Set initial pose
+          starting_vehicle_pose_ = current_vehicle_pose_;
+          setpoint_vehicle_pose_ = current_vehicle_pose_;
 
-        // Respond to request
-        publishResponse(current_mission_ID_, msg->request, true, false);
+          // Preparation for arming
+          mavros_cmds_.arm_cmd_.request.value = true;  // QUESTION(scm); is this actually needed?
+          mavros_cmds_.time_arm_request = ros::Time::now();
+          mavros_cmds_.time_offboard_request = ros::Time::now();
+          current_sequencer_state_ = SequencerState::ARM;
+
+          // Respond to request
+          publishResponse(current_mission_ID_, msg->request, true, false);
+        }
+        else if (checkRequestTime())
+        {
+          // wait
+          ROS_DEBUG_STREAM("* mission_sequencer::request::ARM - waiting for successful mavros communication");
+        }
+        else
+        {
+          ROS_ERROR_STREAM("* mission_sequencer::request::ARM - failed! mavros communication or PREARM error!");
+          ROS_WARN_STREAM("*   Sanity checks: Pose=" << b_pose_is_valid_ << ", State=" << b_state_is_valid_
+                                                    << ", extState=" << b_extstate_is_valid_);
+
+          b_wrong_input = true;
+        }
       }
       else
       {
-        ROS_ERROR_STREAM("* mission_sequencer::request::ARM - failed! mavros communication or PREARM error!");
-        ROS_WARN_STREAM("*   Sanity checks: Pose=" << b_pose_is_valid_ << ", State=" << b_state_is_valid_
-                                                   << ", extState=" << b_extstate_is_valid_);
-
+        ROS_ERROR_STREAM("* mission_sequencer::request::ARM - failed! State change not allowed.");
         b_wrong_input = true;
       }
       break;
@@ -339,38 +355,54 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       ROS_DEBUG_STREAM("* mission_sequencer::request::TAKEOFF...");
       // check if change is approved
       /// \todo TODO(scm): if enum conversion from string exists (or int) then this can be put outside the switch
-      if (checkStateChange(SequencerState::TAKEOFF) && current_vehicle_state_.armed)
+      if (checkStateChange(SequencerState::TAKEOFF))
       {
-        // state change to TAKEOFF is approved
-        if (sequencer_params_.takeoff_type_ == TakeoffType::POSITION)
+        // set time for valid request
+        time_last_valid_request_ = ros::Time::now().toSec();
+
+        if (current_vehicle_state_.armed)
         {
-          // set starting position if they are relative
-          if (sequencer_params_.b_wp_are_relative_)
+          // state change to TAKEOFF is approved
+          if (sequencer_params_.takeoff_type_ == TakeoffType::POSITION)
           {
-            starting_vehicle_pose_ = current_vehicle_pose_;
+            // set starting position if they are relative
+            if (sequencer_params_.b_wp_are_relative_)
+            {
+              starting_vehicle_pose_ = current_vehicle_pose_;
+            }
+            ROS_DEBUG_STREAM("*   starting_pose: " << starting_vehicle_pose_);
+
+            // set takeoff position
+            setpoint_takeoff_pose_ = starting_vehicle_pose_;
+            setpoint_takeoff_pose_.pose.position.z += sequencer_params_.takeoff_z_;
+
+            // set waypoint reached to false and transition to new state
+            b_wp_is_reached_ = false;
+            b_is_landed_ = false;
+            current_sequencer_state_ = SequencerState::TAKEOFF;
+
+            // Respond to request
+            publishResponse(current_mission_ID_, msg->request, true, false);
           }
-          ROS_DEBUG_STREAM("*   starting_pose: " << starting_vehicle_pose_);
-
-          // set takeoff position
-          setpoint_takeoff_pose_ = starting_vehicle_pose_;
-          setpoint_takeoff_pose_.pose.position.z += sequencer_params_.takeoff_z_;
-
-          // set waypoint reached to false and transition to new state
-          b_wp_is_reached_ = false;
-          b_is_landed_ = false;
-          current_sequencer_state_ = SequencerState::TAKEOFF;
-
-          // Respond to request
-          publishResponse(current_mission_ID_, msg->request, true, false);
+          else
+          {
+            ROS_FATAL_STREAM("=> TakeoffType not implemented");
+          }
+        }
+        else if (checkRequestTime())
+        {
+          // wait
+          ROS_DEBUG_STREAM("* mission_sequencer::request::TAKEOFF - waiting for successful arming");
         }
         else
         {
-          ROS_FATAL_STREAM("=> TakeoffType not implemented");
-        }
+          ROS_ERROR_STREAM("* mission_sequencer::request::TAKEOFF - failed! Probably not armed.");
+          b_wrong_input = true;
+        }      
       }
       else
       {
-        ROS_ERROR_STREAM("* mission_sequencer::request::TAKEOFF - failed! Probably not armed.");
+        ROS_ERROR_STREAM("* mission_sequencer::request::TAKEOFF - failed! State change not allowed.");
         b_wrong_input = true;
       }
       break;
@@ -381,6 +413,9 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       // check if change is approved
       if (checkStateChange(SequencerState::HOLD))
       {
+        // set time for valid request
+        time_last_valid_request_ = ros::Time::now().toSec();
+
         // save previous state
         previous_sequencer_state_ = current_sequencer_state_;
         ROS_DEBUG_STREAM("- prehold state: " << previous_sequencer_state_);
@@ -427,6 +462,9 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       // check if change is approved
       if (checkStateChange(SequencerState::RESUME))
       {
+        // set time for valid request
+        time_last_valid_request_ = ros::Time::now().toSec();
+
         ROS_INFO_STREAM("Resuming Mission");
 
         // transition to new state
@@ -451,6 +489,9 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       ROS_DEBUG_STREAM("* mission_sequencer::request::LAND...");
       if (checkStateChange(SequencerState::LAND))
       {
+        // set time for valid request
+        time_last_valid_request_ = ros::Time::now().toSec();
+
         // execute landing
         b_executed_landing_ = executeLanding();
 
@@ -473,6 +514,9 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       ROS_DEBUG_STREAM("* mission_sequencer::request::HOVER...");
       if (checkStateChange(SequencerState::HOVER))
       {
+        // set time for valid request
+        time_last_valid_request_ = ros::Time::now().toSec();
+
         // set the hover pose to the current pose
         setpoint_vehicle_pose_ = current_vehicle_pose_;
         ROS_INFO_STREAM("Hover Position: "
@@ -499,6 +543,9 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       {
         if (checkStateChange(SequencerState::IDLE))
         {
+          // set time for valid request
+          time_last_valid_request_ = ros::Time::now().toSec();
+          
           ROS_WARN_STREAM("=> mission_sequencer: Abort Mission - discard loaded waypoints!");
           current_sequencer_state_ = SequencerState::IDLE;
 
@@ -538,6 +585,9 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       ROS_INFO_STREAM("* mission_sequencer::request::DISARM...");
       if (checkStateChange(SequencerState::DISARM))
       {
+        // set time for valid request
+        time_last_valid_request_ = ros::Time::now().toSec();
+
         // Preparation for arming
         mavros_cmds_.time_disarm_request = ros::Time::now();
 

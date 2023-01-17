@@ -1,4 +1,4 @@
-// Copyright (C) 2021 Christian Brommer, Martin Scheiber, Christoph Boehm,
+// Copyright (C) 2023 Christian Brommer, Martin Scheiber, Christoph Boehm,
 // and others, Control of Networked Systems, University of Klagenfurt, Austria.
 //
 // All rights reserved.
@@ -260,6 +260,7 @@ private:
   SequencerState current_sequencer_state_;
   SequencerState previous_sequencer_state_;
   MissionSequencerOptions sequencer_params_;
+  double time_last_valid_request_; //!< time stamp of last received valid request, used for timeouts
 
   // navigation variables
 private:
@@ -303,6 +304,15 @@ private:
   bool checkWaypoint(const geometry_msgs::PoseStamped& current_waypoint);
   bool checkVelocity(const geometry_msgs::TwistStamped& set_velocity);
   bool checkStateChange(const SequencerState& new_state) const;
+
+  ///
+  /// @brief checkRequestTime checks if the last request time was within the request timeout
+  /// @return true|false if the (current time - last request time) < timeout
+  ///
+  inline bool checkRequestTime() const 
+  {
+    return ros::Time::now().toSec() - time_last_valid_request_ < sequencer_params_.request_timeout_s_;
+  }
 
   ///
   /// \brief checkMissionID checks if the mission ID is suitable with the current mission ID
