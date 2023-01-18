@@ -125,6 +125,9 @@ struct MissionSequencerOptions
   /// \deprecated this will be removed and switched to ROS_DEBUG_STREAM for verbose output
   bool b_do_verbose{ false };
 
+  /// time to wait in seconds afte
+  double request_timeout_s_{ 2.0 };
+
   inline void printSequencer()
   {
     ROS_INFO_STREAM("==> sequencer_options: Parameter Summary -- Sequencer");
@@ -136,6 +139,7 @@ struct MissionSequencerOptions
     ROS_INFO_STREAM("\t- b_hold_zero_vel_:            " << b_hold_zero_vel_);
     ROS_INFO_STREAM("\t- b_predict_hold_wp_:          " << b_predict_hold_wp_);
     ROS_INFO_STREAM("\t- b_do_verbose:                " << b_do_verbose);
+    ROS_INFO_STREAM("\t- request_timeout_s_:          " << request_timeout_s_);
   }
 
   // ==========================================================================

@@ -73,6 +73,7 @@ The following parameters can be set to modify the sequencer's behavior:
 | `threshold_yaw_rad`       | threshold for yaw upon which a WP is accepted | `0.1` |
 | `takeoff_type`            | type for takeoff (`POSITION=0` or `VELOCITY=1`) | `0` |
 | `takeoff_z_m`             | height for takeoff in `POSITION`-mode | `1` |
+| `request_timeout_s`       | timout for failing ARM and TAKEOFF requests | `2.0` |
 | `bound_max`               | boundaries (max) for xyz values | `[1.0,1.0,1.0]` |
 | `bound_min`               | boundaries (min) for xyz values | `[-1.0,-1.0,0.0]` |
 | `boundary_reference`      | reference frame for boundaries (`LOCAL` or `GLOBAL`) | `LOCAL` |

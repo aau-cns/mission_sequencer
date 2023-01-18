@@ -96,6 +96,7 @@ MissionSequencerOptions parse_ros_nodehandle(ros::NodeHandle& nh)
   nh.param<bool>("wp_from_file", params.b_wp_from_file_, params.b_wp_from_file_);
   nh.param<bool>("do_hold_at_zero_vel", params.b_hold_zero_vel_, params.b_hold_zero_vel_);
   nh.param<bool>("do_predict_hold_wp", params.b_predict_hold_wp_, params.b_predict_hold_wp_);
+  nh.param<double>("request_timeout_s", params.request_timeout_s_, params.request_timeout_s_);
   nh.param<bool>("verbose", params.b_do_verbose, params.b_do_verbose);
 
   params.printSequencer();

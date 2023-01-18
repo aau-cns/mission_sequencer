@@ -29,6 +29,7 @@
   <arg name="waypoint_from_file"      default="False" />
   <arg name="verbose"                 default="False" />
 
+  <arg name="request_timeout_s"       default="2.0" />
   <arg name="takeoff_type_int"        default="0" />
   <arg name="takeoff_height_m"        default="1.0" />
 
@@ -61,6 +62,7 @@
     <param name="threshold_position_m"    value="$(arg threshold_position)" />
     <param name="threshold_yaw_rad"       value="$(arg threshold_yaw)" />
 
+    <param name="request_timeout_s"       value="$(arg request_timeout_s)" />
     <param name="takeoff_type"            value="$(arg takeoff_type_int)" />
     <param name="takeoff_z_m"             value="$(arg takeoff_height_m)" />
 
