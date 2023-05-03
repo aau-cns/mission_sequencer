@@ -112,23 +112,29 @@ MissionSequencer::MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh)
       // load waypoint_fn_ filename into filenames_
       reloadFilenames();
     }
-};
+}
 
-MissionSequencer::~MissionSequencer(){
-
-};
+MissionSequencer::~MissionSequencer()
+{
+}
 
 void MissionSequencer::cbVehicleState(const mavros_msgs::State::ConstPtr& msg)
 {
   b_state_is_valid_ = true;
   current_vehicle_state_ = *msg;
-};
+
+  ROS_DEBUG_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_,
+                            " * msg received: armed " << (int)current_vehicle_state_.armed);
+}
 
 void MissionSequencer::cbExtendedVehicleState(const mavros_msgs::ExtendedState::ConstPtr& msg)
 {
   b_extstate_is_valid_ = true;
   current_vehicle_ext_state_ = *msg;
-};
+
+  ROS_DEBUG_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_,
+                            " * msg received: landed state " << (int)current_vehicle_ext_state_.landed_state);
+}
 
 void MissionSequencer::cbPose(const geometry_msgs::PoseStamped::ConstPtr& msg)
 {
@@ -338,7 +344,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
         {
           ROS_ERROR_STREAM("* mission_sequencer::request::ARM - failed! mavros communication or PREARM error!");
           ROS_WARN_STREAM("*   Sanity checks: Pose=" << b_pose_is_valid_ << ", State=" << b_state_is_valid_
-                                                    << ", extState=" << b_extstate_is_valid_);
+                                                     << ", extState=" << b_extstate_is_valid_);
 
           b_wrong_input = true;
         }
@@ -398,7 +404,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
         {
           ROS_ERROR_STREAM("* mission_sequencer::request::TAKEOFF - failed! Probably not armed.");
           b_wrong_input = true;
-        }      
+        }
       }
       else
       {
@@ -545,7 +551,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
         {
           // set time for valid request
           time_last_valid_request_ = ros::Time::now().toSec();
-          
+
           ROS_WARN_STREAM("=> mission_sequencer: Abort Mission - discard loaded waypoints!");
           current_sequencer_state_ = SequencerState::IDLE;
 
@@ -1282,13 +1288,16 @@ void MissionSequencer::performLand()
   }
 
   // mavros check to see if landed
-  if (current_vehicle_ext_state_.landed_state == current_vehicle_ext_state_.LANDED_STATE_ON_GROUND && !b_is_landed_)
+  if (current_vehicle_ext_state_.landed_state == current_vehicle_ext_state_.LANDED_STATE_ON_GROUND)
   {
-    // set landed states
-    b_is_landed_ = true;
+    if (!b_is_landed_)
+    {
+      // set landed states
+      b_is_landed_ = true;
 
-    // respond to completion of landing
-    publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::LAND, false, true);
+      // respond to completion of landing
+      publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::LAND, false, true);
+    }
 
     // check if vehicle is armed
     if (!current_vehicle_state_.armed)
@@ -1489,7 +1498,7 @@ bool MissionSequencer::checkVelocity(const geometry_msgs::TwistStamped& set_velo
   return vel_reached;
 }
 
-bool MissionSequencer::checkStateChange(const SequencerState &new_state) const
+bool MissionSequencer::checkStateChange(const SequencerState& new_state) const
 {
   switch (current_sequencer_state_)
   {
