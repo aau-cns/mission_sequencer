@@ -61,6 +61,7 @@ add_message_files(
   MissionRequest.msg
   MissionResponse.msg
   MissionWaypoint.msg
+  MissionWaypointStamped.msg
   MissionWaypointArray.msg
 )
 

@@ -32,6 +32,7 @@
 #include <mission_sequencer/MissionResponse.h>
 #include <mission_sequencer/MissionWaypoint.h>
 #include <mission_sequencer/MissionWaypointArray.h>
+#include <mission_sequencer/MissionWaypointStamped.h>
 
 // Include Services
 #include <mavros_msgs/CommandBool.h>
@@ -120,7 +121,8 @@ private:
   ros::Publisher pub_pose_setpoint_;  //!< ROS publisher for current setpoint
   ros::Publisher pub_ms_response_;  //!< ROS publisher for mission sequencer request's response. This is similar to the
                                     //!< action feedback given once the request has been fullfilled.
-  ros::Publisher pub_waypoint_list_;  //!< ROS publisher for current waypoint list
+  ros::Publisher pub_waypoint_list_;     //!< ROS publisher for current waypoint list
+  ros::Publisher pub_waypoint_reached_;  //!< ROS publisher for last waypoint reached
 
   // ROS Subscribers
   ros::Subscriber sub_vehicle_state_;           //!< ROS subscriber for mavros vehicle state
@@ -260,7 +262,7 @@ private:
   SequencerState current_sequencer_state_;
   SequencerState previous_sequencer_state_;
   MissionSequencerOptions sequencer_params_;
-  double time_last_valid_request_; //!< time stamp of last received valid request, used for timeouts
+  double time_last_valid_request_;  //!< time stamp of last received valid request, used for timeouts
 
   // navigation variables
 private:
@@ -309,7 +311,7 @@ private:
   /// @brief checkRequestTime checks if the last request time was within the request timeout
   /// @return true|false if the (current time - last request time) < timeout
   ///
-  inline bool checkRequestTime() const 
+  inline bool checkRequestTime() const
   {
     return ros::Time::now().toSec() - time_last_valid_request_ < sequencer_params_.request_timeout_s_;
   }
