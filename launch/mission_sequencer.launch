@@ -86,6 +86,7 @@
     <remap from="mavros/setpoint_position/local"    to="$(arg mavros_setpoint_position_local_o)" />
     <remap from="autonomy/response"                 to="$(arg autonomy_response_o)" />
 
+    <!-- remap mission_sequencer pub topics to be within node NS -->
     <remap from="waypoint_reached"                  to="~waypoint_reached" />
     <remap from="get_waypoint_list"                 to="~get_waypoint_list" />
 

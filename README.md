@@ -8,7 +8,7 @@ ROS package to sequencer mission waypoints and communicate them to the controlle
 Maintainer: [Martin Scheiber](mailto:martin.scheiber@aau.at)
 
 ## Credit
-This code was written by the [Control of Networked System (CNS)](https://www.aau.at/en/smart-systems-technologies/control-of-networked-systems/), University of Klagenfurt, Klagenfurt, Austria.
+This code was written by the [Control of Networked System (CNS) Group](https://www.aau.at/en/smart-systems-technologies/control-of-networked-systems/), University of Klagenfurt, Klagenfurt, Austria.
 
 ## License
 This software is made available to the public to use (_source-available_), licensed under the terms of the BSD-2-Clause-License with no commercial use allowed, the full terms of which are made available in the `LICENSE` file. No license in patents is granted.
@@ -41,8 +41,8 @@ This package is part of the [CNS Flight Stack] and thus depends on the other pac
 - [MavROS (CNS Version)]
 - [PX4Bridge (CNS Version)]
 
-Further the following libraries are required
-- Eigen
+Further, the following libraries are required
+- Eigen3
 - ROS noetic
 
 
@@ -102,7 +102,7 @@ rostopic pub /autonomy/request mission_sequencer/MissionRequest \
 "{header: {seq: 0, stamp: {secs: 0, nsecs: 0}, frame_id: ''}, id: 0, request: 1}" -1
 ```
 
-If the automatic sequencing shall remain disabled, one can still execute the requests manually. To do so use the above publication as a template. Further the request type definition can be found in [`msg/MissionRequest.msg`](msg/MissionRequest.msg):
+If the automatic sequencing shall remain disabled, one can still execute the requests manually. To do so use the above publication as a template. Further, the request type definition can be found in [`msg/MissionRequest.msg`](msg/MissionRequest.msg):
 
 ```
 # request type definition
@@ -119,7 +119,7 @@ uint8 DISARM  = 8 # Disarming
 
 ### Waypoint Modification
 
-By default the Mission Sequencer gets the waypoints from the Autonomy [CNS FlightStack: Autonomy Engine]. However, any node can publish waypoints on the `/mission_sequencer/waypoint_list` topic (message definition [`msg/MissionWaypointArray.msg`](msg/MissionWaypointArray.msg)). Here the following options exist:
+By default, the Mission Sequencer gets the waypoints from the Autonomy [CNS FlightStack: Autonomy Engine]. However, any node can publish waypoints on the `/mission_sequencer/waypoint_list` topic (message definition [`msg/MissionWaypointArray.msg`](msg/MissionWaypointArray.msg)). Here the following options exist:
 
 | Waypoint Action | description |
 |---------------|-------------|
@@ -133,6 +133,8 @@ By default the Mission Sequencer gets the waypoints from the Autonomy [CNS Fligh
 | `LOCAL   = 1`    | the provided WPs are interpreted w.r.t. the starting pose, i.e. 'local frame' |
 | `CUR_POS = 2`    | the provided WPs are interpreted w.r.t. to the current position, i.e. added to the current position, when they are evaluated |
 | `CUR_POSE = 3`   | the provided WPs are interpreted w.r.t. to the current pose (position + yaw), i.e. added to the current position and yaw, when they are evaluated |
+
+Further, the mission sequencer publishes a waypoint message on `/mission_sequencer/waypoint_reached` whenever a waypoint has been reached.
 
 If required for your node (obstacle detection), you can get the current list of waypoints with the service:
 
@@ -157,8 +159,10 @@ None at this point in time, please submit an issue request using the git interfa
 .
 |-- cmake
 |   |-- Custom.cmake
-|   `-- GetGitRevisionDescription.cmake
+|   |-- GetGitRevisionDescription.cmake
+|   `-- GetGitRevisionDescription.cmake.in
 |-- CMakeLists.txt
+|-- CONTRIBUTORS.md
 |-- docs
 |   |-- CMakeLists.txt
 |   |-- pkg-docs
@@ -166,7 +170,8 @@ None at this point in time, please submit an issue request using the git interfa
 |   |   `-- doxyfile.in
 |   `-- resources
 |       |-- cns_UNI_and_CNS_LOGO_uniblue.png
-|       `-- cns_UNI_and_CNS_LOGO_uniblue.svg
+|       |-- cns_UNI_and_CNS_LOGO_uniblue.svg
+|       `-- state_diagram_sequencer.png
 |-- include
 |   `-- mission_sequencer
 |       |-- mission_sequencer.hpp
@@ -179,7 +184,8 @@ None at this point in time, please submit an issue request using the git interfa
 |   |-- MissionRequest.msg
 |   |-- MissionResponse.msg
 |   |-- MissionWaypointArray.msg
-|   `-- MissionWaypoint.msg
+|   |-- MissionWaypoint.msg
+|   `-- MissionWaypointStamped.msg
 |-- package.xml
 |-- README.md
 |-- src
@@ -188,13 +194,13 @@ None at this point in time, please submit an issue request using the git interfa
 |   `-- parser_waypoints.cpp
 |-- srv
 |   `-- GetStartPose.srv
-`-- trajectories
+|-- trajectories
     `-- test_trajectory.csv
 ```
 
 ---
 
-Copyright (C) 2021-2023 Christian Brommer, Christoph Böhm, Alessandro Fornasier, Roland Jung, and Martin Scheiber, Control of Networked Systems, University of Klagenfurt, Austria.
+Copyright (C) 2021-2023 Christian Brommer, Christoph Böhm, Alessandro Fornasier, Roland Jung, and Martin Scheiber, Control of Networked Systems Group, University of Klagenfurt, Austria.
 You can contact the authors at [christian.brommer@aau.at](mailto:christian.brommer@aau.at?subject=[CNS%20Flight%20Stack]%20mission_sequencer%20package), [christoph.boehm@aau.at](mailto:christoph.boehm@aau.at?subject=[CNS%20Flight%20Stack]%20mission_sequencer%20package), [alessandro.fornasier@aau.at](mailto:alessandro.fornasier@aau.at?subject=[CNS%20Flight%20Stack]%20mission_sequencer%20package), [roland.jung@aau.at](mailto:roland.jung@aau.at?subject=[CNS%20Flight%20Stack]%20mission_sequencer%20package), [martin.scheiber@aau.at](mailto:martin.scheiber@aau.at?subject=[CNS%20Flight%20Stack]%20mission_sequencer%20package).
 
 <!-- LINKS: -->
