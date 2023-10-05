@@ -79,13 +79,16 @@
 
     <param name="verbose"                 value="$(arg verbose)" />
 
-    <remap from="mavros/state"                     to="$(arg mavros_state_i)" />
-    <remap from="mavros/extended_state"            to="$(arg mavros_extended_state_i)" />
-    <remap from="mavros/local_position/pose"       to="$(arg mavros_local_position_pose_i)" />
-    <remap from="autonomy/request"                 to="$(arg autonomy_request_i)" />
-    <remap from="mavros/setpoint_position/local"   to="$(arg mavros_setpoint_position_local_o)" />
-    <remap from="autonomy/response"                to="$(arg autonomy_response_o)" />
+    <remap from="mavros/state"                      to="$(arg mavros_state_i)" />
+    <remap from="mavros/extended_state"             to="$(arg mavros_extended_state_i)" />
+    <remap from="mavros/local_position/pose"        to="$(arg mavros_local_position_pose_i)" />
+    <remap from="autonomy/request"                  to="$(arg autonomy_request_i)" />
+    <remap from="mavros/setpoint_position/local"    to="$(arg mavros_setpoint_position_local_o)" />
+    <remap from="autonomy/response"                 to="$(arg autonomy_response_o)" />
 
+    <!-- remap mission_sequencer pub topics to be within node NS -->
+    <remap from="waypoint_reached"                  to="~waypoint_reached" />
+    <remap from="get_waypoint_list"                 to="~get_waypoint_list" />
 
     <param name="mavros_cmd_arming_o"    value="$(arg mavros_cmd_arming_o)" />
     <param name="mavros_cmd_command_o"   value="$(arg mavros_cmd_command_o)" />

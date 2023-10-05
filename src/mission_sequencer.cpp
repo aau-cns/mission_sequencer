@@ -94,6 +94,7 @@ MissionSequencer::MissionSequencer(ros::NodeHandle& nh, ros::NodeHandle& pnh)
   pub_pose_setpoint_ = nh_.advertise<geometry_msgs::PoseStamped>("mavros/setpoint_position/local", 10);
   pub_ms_response_ = nh_.advertise<mission_sequencer::MissionResponse>("autonomy/response", 10);
   pub_waypoint_list_ = nh_.advertise<mission_sequencer::MissionWaypointArray>("get_waypoint_list", 1);
+  pub_waypoint_reached_ = nh_.advertise<mission_sequencer::MissionWaypointStamped>("waypoint_reached", 1);
 
   // setup ROS services (relative to node's namespace)
   srv_mavros_arm_ = nh_.serviceClient<mavros_msgs::CommandBool>(sequencer_params_.srv_cmd_arming_);
@@ -1429,6 +1430,18 @@ bool MissionSequencer::checkWaypoint(const geometry_msgs::PoseStamped& current_w
     ROS_INFO_STREAM("Reached Waypoint: x = "
                     << current_waypoint.pose.position.x << ", y = " << current_waypoint.pose.position.y
                     << ", z = " << current_waypoint.pose.position.z /*<< ", yaw = " << waypoint_list_[0].yaw*/);
+
+    // publish reached waypoint
+    MissionWaypointStamped wp_msg;
+    wp_msg.header.stamp = ros::Time::now();
+    wp_msg.header.frame_id = "todo";
+    wp_msg.waypoint.x = waypoint_list_[0].x;
+    wp_msg.waypoint.y = waypoint_list_[0].y;
+    wp_msg.waypoint.z = waypoint_list_[0].z;
+    wp_msg.waypoint.yaw = waypoint_list_[0].yaw;
+    wp_msg.waypoint.holdtime = waypoint_list_[0].holdtime;
+    pub_waypoint_reached_.publish(wp_msg);
+
     return true;
   }
 
