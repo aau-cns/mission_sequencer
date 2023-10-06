@@ -1435,11 +1435,11 @@ bool MissionSequencer::checkWaypoint(const geometry_msgs::PoseStamped& current_w
     MissionWaypointStamped wp_msg;
     wp_msg.header.stamp = ros::Time::now();
     wp_msg.header.frame_id = "todo";
-    wp_msg.waypoint.x = waypoint_list_[0].x;
-    wp_msg.waypoint.y = waypoint_list_[0].y;
-    wp_msg.waypoint.z = waypoint_list_[0].z;
-    wp_msg.waypoint.yaw = waypoint_list_[0].yaw;
-    wp_msg.waypoint.holdtime = waypoint_list_[0].holdtime;
+    wp_msg.waypoint.x = current_waypoint.pose.position.x;
+    wp_msg.waypoint.y = current_waypoint.pose.position.y;
+    wp_msg.waypoint.z = current_waypoint.pose.position.z;
+    wp_msg.waypoint.yaw = 0.0;       // waypoint_list_[0].yaw;
+    wp_msg.waypoint.holdtime = 0.0;  // waypoint_list_[0].holdtime;
     pub_waypoint_reached_.publish(wp_msg);
 
     return true;
