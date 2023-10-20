@@ -671,6 +671,9 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
     // Respond if input was wrong
     publishResponse(current_mission_ID_, msg->request, false, false);
   }
+
+  // publish any message now to let the autonomy know if request is accepted
+  ros::spinOnce();
 };
 
 void MissionSequencer::cbWaypointFilename(const std_msgs::String::ConstPtr& msg)
