@@ -1151,9 +1151,44 @@ void MissionSequencer::performMission()
         //                          starting_vehicle_pose_.pose.position.z);
         Eigen::Array3d start_pos(starting_vehicle_pose_.pose.position.x, starting_vehicle_pose_.pose.position.y,
                                  starting_vehicle_pose_.pose.position.z);
+
+        // apply starting yaw to bounding
+        tf2::Quaternion startingQuaternion(
+            starting_vehicle_pose_.pose.orientation.x, starting_vehicle_pose_.pose.orientation.y,
+            starting_vehicle_pose_.pose.orientation.z, starting_vehicle_pose_.pose.orientation.w);
+
+        // get yaw-based rotmatrix
+        double startingYaw, startingPitch, startingRoll;
+        tf2::Matrix3x3(startingQuaternion).getEulerYPR(startingYaw, startingPitch, startingRoll);
+        Eigen::Matrix3d Rstart =
+            Eigen::Quaterniond(Eigen::AngleAxisd(startingYaw, Eigen::Vector3d::UnitZ())).toRotationMatrix();
+
+        // rotate boundaries
+        Eigen::Array3d rot_bound_min = (Rstart * Eigen::Vector3d(sequencer_params_.bound_min_)).array();
+        Eigen::Array3d rot_bound_max = (Rstart * Eigen::Vector3d(sequencer_params_.bound_max_)).array();
+
+        // set local boundaries
+        Eigen::Array3d local_bound_min, local_bound_max;
+        local_bound_min.x() = std::min(rot_bound_min.x(), rot_bound_max.x());
+        local_bound_min.y() = std::min(rot_bound_min.y(), rot_bound_max.y());
+        local_bound_min.z() = std::min(rot_bound_min.z(), rot_bound_max.z());
+        local_bound_max.x() = std::max(rot_bound_min.x(), rot_bound_max.x());
+        local_bound_max.y() = std::max(rot_bound_min.y(), rot_bound_max.y());
+        local_bound_max.z() = std::max(rot_bound_min.z(), rot_bound_max.z());
+
         // Component-wise opertaion
-        calc_min -= (sequencer_params_.bound_min_ + start_pos);
-        calc_max += (sequencer_params_.bound_max_ + start_pos);
+        calc_min -= (local_bound_min + start_pos);
+        calc_max += (local_bound_max + start_pos);
+        ROS_DEBUG_STREAM("Bounds Info:\n"
+                         << "\tmin:   " << local_bound_min.transpose() << "\n"
+                         << "\tmax:   " << local_bound_max.transpose()
+                         << "\n"
+                         //  << "\trmin:  " << rot_bound_min.transpose() << "\n"
+                         //  << "\trmax:  " << rot_bound_max.transpose() << "\n"
+                         << "\tstart: " << start_pos.transpose() << "\n"
+                         << "\tyaws:  " << startingYaw << "\n"
+                         //  << "\tR:     " << Rstart
+        );
         break;
       }
     }
