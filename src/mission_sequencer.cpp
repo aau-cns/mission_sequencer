@@ -190,7 +190,7 @@ void MissionSequencer::updatePose(const geometry_msgs::PoseStamped& pose)
     double startingYaw, startingPitch, startingRoll;
     tf2::Matrix3x3(q_NED_BODY).getEulerYPR(startingYaw, startingPitch, startingRoll);
     startingYaw = warp_to_pi(startingYaw);
-    if (b_do_verbose_)
+    if (sequencer_params_.b_do_verbose)
     {
       ROS_INFO_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_,
                                "* Initial (PX4/NED) yaw= " << startingYaw * RAD_TO_DEG
@@ -483,7 +483,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       }
       else
       {
-        if (b_do_verbose_)
+        if (sequencer_params_.b_do_verbose)
         {
           ROS_ERROR_STREAM("* mission_sequencer::request::RESUME - failed! Not in HOLD!");
         }
@@ -648,7 +648,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       }
       else
       {
-        if (b_do_verbose_)
+        if (sequencer_params_.b_do_verbose)
         {
           ROS_WARN_STREAM("* mission_sequencer::request::READ - failed! Not in IDLE!");
         }
@@ -680,7 +680,7 @@ void MissionSequencer::cbWaypointFilename(const std_msgs::String::ConstPtr& msg)
 {
   std::string fn = msg->data.c_str();
   bool res = setWaypointFilename(fn);
-  if (b_do_verbose_)
+  if (sequencer_params_.b_do_verbose)
   {
     ROS_INFO_STREAM("Received new waypoint_filename: " << fn << "; accepted:" << res);
   }
