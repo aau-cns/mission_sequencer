@@ -1125,6 +1125,9 @@ void MissionSequencer::performMission()
       waypoint_list_[0].y = next_wp.pose.position.y;
       waypoint_list_[0].z = next_wp.pose.position.z;
       waypoint_list_[0].ref_frame = Waypoint::ReferenceFrame::GLOBAL;
+
+      // update next_wp
+      next_wp = waypointToPoseStamped(waypoint_list_[0]);
     }
 
     // check if waypoint is within boundaries
@@ -1476,8 +1479,8 @@ bool MissionSequencer::checkWaypoint(const geometry_msgs::PoseStamped& current_w
     wp_msg.waypoint.x = current_waypoint.pose.position.x;
     wp_msg.waypoint.y = current_waypoint.pose.position.y;
     wp_msg.waypoint.z = current_waypoint.pose.position.z;
-    wp_msg.waypoint.yaw = 0.0;       // waypoint_list_[0].yaw;
-    wp_msg.waypoint.holdtime = 0.0;  // waypoint_list_[0].holdtime;
+    wp_msg.waypoint.yaw = 0.0;  // waypoint_list_[0].yaw;
+    wp_msg.waypoint.holdtime = waypoint_list_[0].holdtime;
     pub_waypoint_reached_.publish(wp_msg);
 
     return true;
