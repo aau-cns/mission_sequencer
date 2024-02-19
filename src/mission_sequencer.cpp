@@ -1467,10 +1467,17 @@ bool MissionSequencer::checkWaypoint(const geometry_msgs::PoseStamped& current_w
 
   if (diff_position < sequencer_params_.threshold_position_ && std::fabs(diff_yaw) < sequencer_params_.threshold_yaw_)
   {
-    /// \todo TODO(scm): provide the yaw somehow here
-    ROS_INFO_STREAM("Reached Waypoint: x = "
-                    << current_waypoint.pose.position.x << ", y = " << current_waypoint.pose.position.y
-                    << ", z = " << current_waypoint.pose.position.z /*<< ", yaw = " << waypoint_list_[0].yaw*/);
+    // get yaw of reached waypoint
+    tf2::Quaternion waypointQuaternion(current_waypoint.pose.orientation.x, current_waypoint.pose.orientation.y,
+                                       current_waypoint.pose.orientation.z, current_waypoint.pose.orientation.w);
+
+    // get yaw-based rotmatrix
+    double waypointYaw, waypointPitch, waypointRoll;
+    tf2::Matrix3x3(waypointQuaternion).getEulerYPR(waypointYaw, waypointPitch, waypointRoll);
+
+    ROS_INFO_STREAM("Reached Waypoint"
+                    << ": x = " << current_waypoint.pose.position.x << ", y = " << current_waypoint.pose.position.y
+                    << ", z = " << current_waypoint.pose.position.z << ", yaw = " << waypointYaw);
 
     // publish reached waypoint
     MissionWaypointStamped wp_msg;
@@ -1479,8 +1486,13 @@ bool MissionSequencer::checkWaypoint(const geometry_msgs::PoseStamped& current_w
     wp_msg.waypoint.x = current_waypoint.pose.position.x;
     wp_msg.waypoint.y = current_waypoint.pose.position.y;
     wp_msg.waypoint.z = current_waypoint.pose.position.z;
-    wp_msg.waypoint.yaw = 0.0;  // waypoint_list_[0].yaw;
-    wp_msg.waypoint.holdtime = waypoint_list_[0].holdtime;
+    wp_msg.waypoint.yaw = waypointYaw;
+
+    // HACK(scm): this information is not available in the current waypoint, use the waypoint list instead
+    if (!waypoint_list_.empty())
+    {
+      wp_msg.waypoint.holdtime = waypoint_list_[0].holdtime;
+    }
     pub_waypoint_reached_.publish(wp_msg);
 
     return true;
