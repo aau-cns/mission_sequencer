@@ -190,7 +190,7 @@ void MissionSequencer::updatePose(const geometry_msgs::PoseStamped& pose)
     double startingYaw, startingPitch, startingRoll;
     tf2::Matrix3x3(q_NED_BODY).getEulerYPR(startingYaw, startingPitch, startingRoll);
     startingYaw = warp_to_pi(startingYaw);
-    if (b_do_verbose_)
+    if (sequencer_params_.b_do_verbose)
     {
       ROS_INFO_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_,
                                "* Initial (PX4/NED) yaw= " << startingYaw * RAD_TO_DEG
@@ -483,7 +483,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       }
       else
       {
-        if (b_do_verbose_)
+        if (sequencer_params_.b_do_verbose)
         {
           ROS_ERROR_STREAM("* mission_sequencer::request::RESUME - failed! Not in HOLD!");
         }
@@ -648,7 +648,7 @@ void MissionSequencer::cbMSRequest(const mission_sequencer::MissionRequest::Cons
       }
       else
       {
-        if (b_do_verbose_)
+        if (sequencer_params_.b_do_verbose)
         {
           ROS_WARN_STREAM("* mission_sequencer::request::READ - failed! Not in IDLE!");
         }
@@ -680,7 +680,7 @@ void MissionSequencer::cbWaypointFilename(const std_msgs::String::ConstPtr& msg)
 {
   std::string fn = msg->data.c_str();
   bool res = setWaypointFilename(fn);
-  if (b_do_verbose_)
+  if (sequencer_params_.b_do_verbose)
   {
     ROS_INFO_STREAM("Received new waypoint_filename: " << fn << "; accepted:" << res);
   }
@@ -1125,6 +1125,9 @@ void MissionSequencer::performMission()
       waypoint_list_[0].y = next_wp.pose.position.y;
       waypoint_list_[0].z = next_wp.pose.position.z;
       waypoint_list_[0].ref_frame = Waypoint::ReferenceFrame::GLOBAL;
+
+      // update next_wp
+      next_wp = waypointToPoseStamped(waypoint_list_[0]);
     }
 
     // check if waypoint is within boundaries
@@ -1151,9 +1154,44 @@ void MissionSequencer::performMission()
         //                          starting_vehicle_pose_.pose.position.z);
         Eigen::Array3d start_pos(starting_vehicle_pose_.pose.position.x, starting_vehicle_pose_.pose.position.y,
                                  starting_vehicle_pose_.pose.position.z);
+
+        // apply starting yaw to bounding
+        tf2::Quaternion startingQuaternion(
+            starting_vehicle_pose_.pose.orientation.x, starting_vehicle_pose_.pose.orientation.y,
+            starting_vehicle_pose_.pose.orientation.z, starting_vehicle_pose_.pose.orientation.w);
+
+        // get yaw-based rotmatrix
+        double startingYaw, startingPitch, startingRoll;
+        tf2::Matrix3x3(startingQuaternion).getEulerYPR(startingYaw, startingPitch, startingRoll);
+        Eigen::Matrix3d Rstart =
+            Eigen::Quaterniond(Eigen::AngleAxisd(startingYaw, Eigen::Vector3d::UnitZ())).toRotationMatrix();
+
+        // rotate boundaries
+        Eigen::Array3d rot_bound_min = (Rstart * Eigen::Vector3d(sequencer_params_.bound_min_)).array();
+        Eigen::Array3d rot_bound_max = (Rstart * Eigen::Vector3d(sequencer_params_.bound_max_)).array();
+
+        // set local boundaries
+        Eigen::Array3d local_bound_min, local_bound_max;
+        local_bound_min.x() = std::min(rot_bound_min.x(), rot_bound_max.x());
+        local_bound_min.y() = std::min(rot_bound_min.y(), rot_bound_max.y());
+        local_bound_min.z() = std::min(rot_bound_min.z(), rot_bound_max.z());
+        local_bound_max.x() = std::max(rot_bound_min.x(), rot_bound_max.x());
+        local_bound_max.y() = std::max(rot_bound_min.y(), rot_bound_max.y());
+        local_bound_max.z() = std::max(rot_bound_min.z(), rot_bound_max.z());
+
         // Component-wise opertaion
-        calc_min -= (sequencer_params_.bound_min_ + start_pos);
-        calc_max += (sequencer_params_.bound_max_ + start_pos);
+        calc_min -= (local_bound_min + start_pos);
+        calc_max += (local_bound_max + start_pos);
+        ROS_DEBUG_STREAM("Bounds Info:\n"
+                         << "\tmin:   " << local_bound_min.transpose() << "\n"
+                         << "\tmax:   " << local_bound_max.transpose()
+                         << "\n"
+                         //  << "\trmin:  " << rot_bound_min.transpose() << "\n"
+                         //  << "\trmax:  " << rot_bound_max.transpose() << "\n"
+                         << "\tstart: " << start_pos.transpose() << "\n"
+                         << "\tyaws:  " << startingYaw << "\n"
+                         //  << "\tR:     " << Rstart
+        );
         break;
       }
     }
@@ -1429,10 +1467,17 @@ bool MissionSequencer::checkWaypoint(const geometry_msgs::PoseStamped& current_w
 
   if (diff_position < sequencer_params_.threshold_position_ && std::fabs(diff_yaw) < sequencer_params_.threshold_yaw_)
   {
-    /// \todo TODO(scm): provide the yaw somehow here
-    ROS_INFO_STREAM("Reached Waypoint: x = "
-                    << current_waypoint.pose.position.x << ", y = " << current_waypoint.pose.position.y
-                    << ", z = " << current_waypoint.pose.position.z /*<< ", yaw = " << waypoint_list_[0].yaw*/);
+    // get yaw of reached waypoint
+    tf2::Quaternion waypointQuaternion(current_waypoint.pose.orientation.x, current_waypoint.pose.orientation.y,
+                                       current_waypoint.pose.orientation.z, current_waypoint.pose.orientation.w);
+
+    // get yaw-based rotmatrix
+    double waypointYaw, waypointPitch, waypointRoll;
+    tf2::Matrix3x3(waypointQuaternion).getEulerYPR(waypointYaw, waypointPitch, waypointRoll);
+
+    ROS_INFO_STREAM("Reached Waypoint"
+                    << ": x = " << current_waypoint.pose.position.x << ", y = " << current_waypoint.pose.position.y
+                    << ", z = " << current_waypoint.pose.position.z << ", yaw = " << waypointYaw);
 
     // publish reached waypoint
     MissionWaypointStamped wp_msg;
@@ -1441,8 +1486,13 @@ bool MissionSequencer::checkWaypoint(const geometry_msgs::PoseStamped& current_w
     wp_msg.waypoint.x = current_waypoint.pose.position.x;
     wp_msg.waypoint.y = current_waypoint.pose.position.y;
     wp_msg.waypoint.z = current_waypoint.pose.position.z;
-    wp_msg.waypoint.yaw = 0.0;       // waypoint_list_[0].yaw;
-    wp_msg.waypoint.holdtime = 0.0;  // waypoint_list_[0].holdtime;
+    wp_msg.waypoint.yaw = waypointYaw;
+
+    // HACK(scm): this information is not available in the current waypoint, use the waypoint list instead
+    if (!waypoint_list_.empty())
+    {
+      wp_msg.waypoint.holdtime = waypoint_list_[0].holdtime;
+    }
     pub_waypoint_reached_.publish(wp_msg);
 
     return true;
