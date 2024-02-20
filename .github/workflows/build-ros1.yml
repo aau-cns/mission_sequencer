@@ -1,0 +1,80 @@
+# Copyright (C) 2024 Martin Scheiber and Christian Brommer,
+# Control of Networked Systems, University of Klagenfurt, Austria.
+#
+# All rights reserved.
+#
+# This software is licensed under the terms of the BSD-2-Clause-License with
+# no commercial use allowed, the full terms of which are made available
+# in the LICENSE file. No license in patents is granted.
+#
+# You can contact the author at <martin.scheiber@ieee.org> and
+# <christian.brommer@ieee.org>.
+
+name: Build ROS
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - '.github/workflows/build-ros1.yml'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - 'include/**'
+      - 'msg/**'
+      - 'package.xml'
+      - 'src/**'
+      - 'srv/**'
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+    - '.github/workflows/build-ros1.yml'
+    - 'cmake/**'
+    - 'CMakeLists.txt'
+    - 'include/**'
+    - 'msg/**'
+    - 'package.xml'
+    - 'src/**'
+    - 'srv/**'
+
+jobs:
+  build:
+    name: Build ROS
+    runs-on: ubuntu-latest
+    container: ros:${{ matrix.ros_version }}-ros-core
+    strategy:
+      fail-fast: false
+      matrix:
+        ros_version:
+          - noetic
+    steps:
+    - name: Get System Dependencies (Git/Build Tools/ROS Dependencies)
+      run: >
+           apt update && apt install --no-install-recommends -y
+           software-properties-common
+           && add-apt-repository -y ppa:git-core/ppa
+           && apt update
+           && apt install --no-install-recommends -y 
+           build-essential
+           git
+           python3-catkin-tools
+           python3-rosdep
+           ros-${{ matrix.ros_version }}-mavros-msgs
+           ros-${{ matrix.ros_version }}-tf
+           ros-${{ matrix.ros_version }}-tf2-eigen
+           ros-${{ matrix.ros_version }}-tf2-ros
+    
+    - name: Create Catkin Workspace
+      run: mkdir -p ${{github.workspace}}/ms_test_cws/src
+
+    - name: Download Autonomy Engine into Workspace
+      uses: actions/checkout@v4
+      with:
+        path: ${{github.workspace}}/ms_test_cws/src/mission_sequencer
+    
+    - name: Build Autonomy
+      working-directory: ${{github.workspace}}/ms_test_cws/
+      run: /bin/bash -c "ls src; source /opt/ros/${{ matrix.ros_version }}/setup.bash; catkin build mission_sequencer"
