@@ -248,6 +248,7 @@ private:
   bool b_executed_landing_{ false };   //!< flag to determine if a landing command has been executed
   bool b_is_landed_{ true };           //!< flag to determine if the vehicle has landed
   bool b_wp_is_reached_{ false };      //!< flag to determine if waypoint has been reached
+  bool b_is_arming_mavros_{ false };   //!< flag to determine if the vehicle is currently arming on mavros side
 
   // state machine
 private:

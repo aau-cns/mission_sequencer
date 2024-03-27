@@ -124,6 +124,15 @@ void MissionSequencer::cbVehicleState(const mavros_msgs::State::ConstPtr& msg)
   b_state_is_valid_ = true;
   current_vehicle_state_ = *msg;
 
+  if (b_is_arming_mavros_ && current_vehicle_state_.armed)
+  {
+    // arming complete
+    b_is_arming_mavros_ = false;
+
+    // respond to completion of arming
+    publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::ARM, false, true);
+  }
+
   ROS_DEBUG_STREAM_THROTTLE(sequencer_params_.topic_debug_interval_,
                             " * msg received: armed " << (int)current_vehicle_state_.armed);
 }
@@ -1046,7 +1055,8 @@ void MissionSequencer::performArming()
           current_vehicle_state_.armed = true;
 
           // respond to completion of arming
-          publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::ARM, false, true);
+          // publishResponse(current_mission_ID_, mission_sequencer::MissionRequest::ARM, false, true);
+          b_is_arming_mavros_ = true;
         }
         else
         {
